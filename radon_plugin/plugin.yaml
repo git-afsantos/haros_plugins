@@ -1,6 +1,6 @@
 %YAML 1.1
 ---
-name: radon
+name: radon_plugin
 version: 0.1
 languages:
     - python
