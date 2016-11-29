@@ -1,0 +1,15 @@
+%YAML 1.1
+---
+name: radon
+version: 0.1
+languages:
+    - python
+rules: {}
+metrics: {}
+supported_rules: []
+supported_metrics:
+    - cyclomatic_complexity
+    - halstead_bugs
+    - halstead_time
+    - halstead_volume
+    - maintainability_index
