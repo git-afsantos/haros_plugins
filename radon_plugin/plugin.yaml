@@ -8,8 +8,13 @@ rules: {}
 metrics: {}
 supported_rules: []
 supported_metrics:
+    - comment_ratio
     - cyclomatic_complexity
     - halstead_bugs
     - halstead_time
     - halstead_volume
+    - lloc
+    - locom
     - maintainability_index
+    - ploc
+    - sloc
