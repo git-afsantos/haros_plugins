@@ -2,14 +2,9 @@
 ---
 name: ccd_plugin
 version: 0.1
-type: analysis post-analysis
 languages:
     - cpp
-rules: {}
-metrics: {}
-supported_rules: []
 supported_metrics:
     - halstead_bugs
     - halstead_time
     - halstead_volume
-    - maintainability_index

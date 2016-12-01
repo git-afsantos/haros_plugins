@@ -386,31 +386,3 @@ def file_analysis(iface, scope):
     iface.report_metric("halstead_volume", metrics.getVolume())
     iface.report_metric("halstead_time", metrics.getEffort() / 18.0)
     iface.report_metric("halstead_bugs", metrics.getVolume() / 3000.0)
-
-def post_file_analysis(iface, scope, violations = None, metrics = None):
-    loc = -1
-    ratio = -1
-    cc = 0
-    vol = -1
-    if not metrics:
-        return
-    for m in metrics:
-        if m.metric.id == "halstead_volume":
-            vol = m.value
-        elif m.metric.id == "comment_ratio":
-            ratio = m.value
-        elif m.metric.id == "cyclomatic_complexity":
-            if hasattr(m, "function"):
-                cc += m.value
-        elif m.metric.id == "lloc":
-            loc = m.value
-        elif m.metric.id == "sloc" and loc < 0:
-            loc = m.value
-    if cc > 0 and vol > 0 and loc > 0 and ratio >= 0:
-        sloc_scale = math.log(loc)
-        volume_scale = math.log(vol)
-        comments_scale = math.sqrt(2.46 * math.radians(ratio * 100))
-        nn_mi = (171 - 5.2 * volume_scale - .23 * complexity - 16.2 \
-                 * sloc_scale + 50 * math.sin(comments_scale))
-        mi = min(max(0., nn_mi * 100 / 171.), 100.)
-        iface.report_metric("maintainability_index", mi)
