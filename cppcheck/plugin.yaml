@@ -1,0 +1,332 @@
+%YAML 1.1
+---
+name: cppcheck_plugin
+version: 0.1
+languages:
+    - cpp
+rules:
+    uninitMemberVar:
+        name:           No Uninitialized Member Variables
+        scope:          class
+        description:    All member variables of a class should be initialized after calling the constructor.
+        tags:
+            - code-standards
+            - classes
+            - member-variables
+            - uninitialized-variables
+            - constructors
+            - google-cpp
+            - jsf-av-cpp
+            - misra-cpp
+            - hicpp
+    unusedFunction:
+        name:           No Unused Variables
+        scope:          file
+        description:    There shall be no unused variables.
+        tags:
+            - code-standards
+            - variables
+            - unused-variables
+            - misra-cpp
+    redundantAssignment:
+        name:           No Redundant Expressions
+        scope:          file
+        description:    Ensure that no expression is redundant.
+        tags:
+            - code-standards
+            - redundancy
+            - hicpp
+    unreadVariable:
+        name:           No Redundant Variables
+        scope:          file
+        description:    Ensure that no expression is redundant.
+        tags:
+            - code-standards
+            - redundancy
+            - hicpp
+    variableScope:
+        name:           Smallest Feasible Scope
+        scope:          file
+        description:    Declarations should be at the smallest feasible scope.
+        tags:
+            - code-standards
+            - scope
+            - declarations
+            - jsf-av-cpp
+    harosDeprecatedSTL:
+        name:           Deprecated Functions
+        scope:          file
+        description:    Do not use deprecated STL library features.
+        tags:
+            - code-standards
+            - deprecation
+            - functions
+            - hicpp
+    harosRegisterKeyword:
+        name:           Do Not Use register
+        scope:          file
+        description:    Do not use the deprecated register keyword.
+        tags:
+            - code-standards
+            - deprecation
+            - register
+            - cpp11
+            - hicpp
+    harosThrowSpecification:
+        name:           Use noexcept
+        scope:          function
+        description:    Do not use throw exception specifications. Use noexcept instead.
+        tags:
+            - code-standards
+            - deprecation
+            - cpp11
+            - exceptions
+            - throw
+            - hicpp
+    harosCaseWithoutBreak:
+        name:           Unexpected Case Fall Through
+        scope:          function
+        description:    Non-empty case blocks must not fall through to the next case.
+        tags:
+            - code-standards
+            - switch
+            - case
+            - fall-through
+            - hicpp
+    harosBooleanCase:
+        name:           At Least Two Cases
+        scope:          function
+        description:    A switch should have at least two cases distinct from the default case.
+        tags:
+            - code-standards
+            - switch
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosEnumWithoutBase:
+        name:           Enum With No Base Type
+        scope:          file
+        description:    Ensure that an enum has a specified base type able to accomodate all its values.
+        tags:
+            - code-standards
+            - enum
+            - types
+            - hicpp
+    harosInlineAssembly:
+        name:           No ASM Declarations
+        scope:          file
+        description:    Do not use asm declarations.
+        tags:
+            - code-standards
+            - assembly
+            - asm
+            - hicpp
+    harosDoublePointer:
+        name:           Pointer Indirection
+        scope:          file
+        description:    Use at most one level of pointer indirection.
+        tags:
+            - code-standards
+            - pointers
+            - multiple-pointers
+            - hicpp
+    harosTriplePointer:
+        name:           Pointer Indirection
+        scope:          file
+        description:    Use at most two levels of pointer indirection.
+        tags:
+            - code-standards
+            - pointers
+            - multiple-pointers
+            - misra-cpp
+            - jsf-av-cpp
+    harosSixParams:
+        name:           Maximum of 6 Function Parameters
+        scope:          function
+        description:    "Maximum number of function parameters: 6"
+        tags:
+            - code-standards
+            - functions
+            - parameters
+            - hicpp
+    harosConstUniquePtr:
+        name:           No unique_ptr by Const Reference
+        scope:          function
+        description:    "Do not pass a std::unique_ptr by const reference."
+        tags:
+            - code-standards
+            - pointers
+            - std-unique-ptr
+            - const
+            - references
+            - hicpp
+    harosDefaultArguments:
+        name:           No Default Arguments
+        scope:          function
+        description:    Do not use default arguments.
+        tags:
+            - code-standards
+            - functions
+            - default-arguments
+            - arguments
+            - parameters
+            - hicpp
+    harosBooleanVector:
+        name:           No Boolean Vectors
+        scope:          file
+        description:    "Do not use std::vector<bool>. It does not conform to the requirements of a container."
+        tags:
+            - code-standards
+            - std-vector
+            - boolean
+            - hicpp
+            - misra-cpp
+    harosUnion:
+        name:           No Unions
+        scope:          file
+        description:    Do not use unions. Use a safe polymorphic abstraction, instead.
+        tags:
+            - code-standards
+            - unions
+            - polymorphism
+            - type-safety
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosIntegerTypes:
+        name:           Integer Types
+        scope:          file
+        description:    Do not use integer types directly. Use size-specific typedefs, for instance from <cstdint>.
+        tags:
+            - code-standards
+            - integer-types
+            - type-safety
+            - portability
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosAssignIncrement:
+        name:           Order of Evaluation
+        scope:          file
+        description:    Do not rely on the sequence of evaluation within an expression.
+        tags:
+            - code-standards
+            - evaluation-order
+            - expressions
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosAssignAssignment:
+        name:           Order of Evaluation
+        scope:          file
+        description:    Do not rely on the sequence of evaluation within an expression.
+        tags:
+            - code-standards
+            - evaluation-order
+            - expressions
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosFloatEquality:
+        name:           Float Accuracy
+        scope:          file
+        description:    Do not write code that expects floating point calculations to yield exact results.
+        tags:
+            - code-standards
+            - floats
+            - floating-point
+            - hicpp
+    harosOverrideUnaryAnd:
+        name:           Operator Overload
+        scope:          file
+        description:    Do not overload operators with special semantics, such as '&&', '||', ',' or '&'.
+        tags:
+            - code-standards
+            - overload
+            - operators
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosOverrideBinaryAnd:
+        name:           Operator Overload
+        scope:          file
+        description:    Do not overload operators with special semantics, such as '&&', '||', ',' or '&'.
+        tags:
+            - code-standards
+            - overload
+            - operators
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosOverrideBinaryOr:
+        name:           Operator Overload
+        scope:          file
+        description:    Do not overload operators with special semantics, such as '&&', '||', ',' or '&'.
+        tags:
+            - code-standards
+            - overload
+            - operators
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosOverrideComma:
+        name:           Operator Overload
+        scope:          file
+        description:    Do not overload operators with special semantics, such as '&&', '||', ',' or '&'.
+        tags:
+            - code-standards
+            - overload
+            - operators
+            - hicpp
+            - misra-cpp
+            - jsf-av-cpp
+    harosUsingErrno:
+        name:           C Standard Library
+        scope:          file
+        description:    Wrap use of the C Standard Library.
+        tags:
+            - code-standards
+            - c
+            - libraries
+            - c-standard-library
+            - hicpp
+            - misra-cpp
+    harosRvalueStdArray:
+        name:           Array Reference
+        scope:          function
+        description:    "Do not create an rvalue reference of std::array."
+        tags:
+            - code-standards
+            - std-array
+            - rvalue-reference
+            - hicpp
+supported_rules:
+    - uninitMemberVar
+    - unusedFunction
+    - redundantAssignment
+    - unreadVariable
+    - variableScope
+    - harosDeprecatedSTL
+    - harosRegisterKeyword
+    - harosThrowSpecification
+    - harosCaseWithoutBreak
+    - harosBooleanCase
+    - harosEnumWithoutBase
+    - harosInlineAssembly
+    - harosDoublePointer
+    - harosTriplePointer
+    - harosSixParams
+    - harosConstUniquePtr
+    - harosDefaultArguments
+    - harosBooleanVector
+    - harosUnion
+    - harosIntegerTypes
+    - harosAssignIncrement
+    - harosAssignAssignment
+    - harosFloatEquality
+    - harosOverrideUnaryAnd
+    - harosOverrideBinaryAnd
+    - harosOverrideBinaryOr
+    - harosOverrideComma
+    - harosUsingErrno
+    - harosRvalueStdArray
