@@ -6,6 +6,7 @@ MI_PARAMETERS = ("lloc", "sloc", "cyclomatic_complexity", "comment_ratio",
 
 class Maintainability(object):
     def __init__(self):
+        self.mi = None
         self.lloc = None
         self.sloc = None
         self.ratio = None
@@ -38,7 +39,7 @@ def pre_process():
 
 def process_file_metric(iface, datum):
     metric = datum.metric.id
-    if not metric in MI_PARAMETERS:
+    if not metric in MI_PARAMETERS and metric != "maintainability_index":
         return
     if not datum.scope.id in iface.state:
         iface.state[datum.scope.id] = Maintainability()
@@ -55,9 +56,13 @@ def process_file_metric(iface, datum):
         mi.cc += datum.value
     elif metric == "halstead_volume":
         mi.hvol = datum.value
+    elif metric == "maintainability_index":
+        mi.mi = datum.value
 
 def post_process(iface):
     for id, mi in iface.state.iteritems():
+        if not mi.mi is None:
+            continue
         value = mi.compute()
         if not value is None:
             iface.report_file_metric("maintainability_index", value, id)
