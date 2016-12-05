@@ -1,0 +1,12 @@
+%YAML 1.1
+---
+name: lizard_plugin
+version: 0.1
+languages:
+	- cpp
+	- java
+    - python
+supported_metrics:
+    - cyclomatic_complexity
+    - function_parameters
+    - ploc
