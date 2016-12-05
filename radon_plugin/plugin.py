@@ -31,9 +31,9 @@ def analyse_raw_metrics(iface, code):
     metrics = analyze(code)
     iface.report_metric("lloc", metrics.lloc)
     iface.report_metric("sloc", metrics.sloc)
-    iface.report_metric("ploc", metrics.loc)
     locom = metrics.comments + metrics.multi
     iface.report_metric("comments", locom)
+    iface.report_metric("ploc", metrics.sloc - locom)
     ratio = locom / float(metrics.sloc) if metrics.sloc != 0 else 0
     iface.report_metric("comment_ratio", ratio)
     if ratio < 0.2:
