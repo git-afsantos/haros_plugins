@@ -73,7 +73,7 @@ def handle_report(iface, files, error):
 
 def file_mapping(pkg):
     files = {}
-        for f in pkg.source_files:
-            if f.language == "cpp":
-                files[f.get_path()] = f.id
+    for f in pkg.source_files:
+        if f.language == "cpp":
+            files[f.get_path()] = f.id
     return files
