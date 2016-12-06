@@ -6,6 +6,7 @@ languages:
     - cpp
 rules:
     roscpp_4.3:
+        name: ROS Cpp Style Guide 4.3
         scope: file
         description:
             All files are under_scored.
