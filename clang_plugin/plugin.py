@@ -29,7 +29,9 @@ def file_analysis(iface, scope):
                 print d
     # traverse nodes
     cursor = unit.cursor
-    global_scope = CppGlobalScope.INSTANCE
+    # we cannot reuse the same instance of global scope, or else we get stuff
+    # from other files mixed in
+    global_scope = CppGlobalScope()
     for node in cursor.get_children():
         if node.location.file and node.location.file.name == file_path:
             global_scope.add_from_cursor(node)
