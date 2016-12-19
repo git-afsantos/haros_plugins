@@ -62,8 +62,8 @@ def file_analysis(iface, scope):
         for r in c.publish:
             if r[0] in advars:
                 pubs.add(r[0])
-            iface.report_metric("publish_nesting", var[1],
-                                line = var[2].line, function = c.function)
+            iface.report_metric("publish_nesting", r[1],
+                                line = r[2].line, function = c.function)
         for r in c.sleep:
             if r in spinners:
                 if isinstance(spinners[r], (int, long)):
