@@ -35,7 +35,7 @@ def file_analysis(iface, scope):
     for node in cursor.get_children():
         if node.location.file and node.location.file.name == file_path:
             global_scope.add_from_cursor(node)
-    data = [FunctionCollector(f) for f in collect_functions()]
+    data = [FunctionCollector(f) for f in collect_functions(global_scope)]
     spinners = {}
     subs = set()
     ads = {}
