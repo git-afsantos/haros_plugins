@@ -1,0 +1,56 @@
+%YAML 1.1
+---
+name: clang_plugin
+version: 0.1
+languages:
+    - cpp
+metrics:
+    spin_rate:
+        name: Spin Rate
+        description: Rate at which a node spins.
+        scope: file
+        min: 0
+    subscribers:
+        name: Number of Subscriptions
+        description: Number of topics a node subscribes to.
+        scope: file
+        min: 0
+    subscribe_nesting:
+        name: Level of Subscription Nesting
+        description: Number of levels of control flow wrapping a subscription.
+        scope: file
+        min: 0
+    advertisers:
+        name: Number of Advertisements
+        description: Number of topics a node advertises.
+        scope: file
+        min: 0
+    advertise_nesting:
+        name: Level of Advertisement Nesting
+        description: Number of levels of control flow wrapping an advertisement.
+        scope: file
+        min: 0
+    publishers:
+        name: Number of Publications
+        description: Number of topics a node publishes to.
+        scope: file
+        min: 0
+    publish_nesting:
+        name: Level of Publication Nesting
+        description: Number of levels of control flow wrapping a publication.
+        scope: file
+        min: 0
+    queue_size:
+        name: Size of Topic Queue
+        description: Size given to a topic queue.
+        scope: file
+        min: 0
+supported_metrics:
+    - spin_rate
+    - subscribers
+    - subscribe_nesting
+    - advertisers
+    - advertise_nesting
+    - publishers
+    - publish_nesting
+    - queue_size
