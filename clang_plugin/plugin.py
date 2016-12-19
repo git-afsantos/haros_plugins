@@ -936,7 +936,11 @@ def _parse(cursor, **options):
         return int(token.spelling) if token else 0
     if cursor.kind == clang.CursorKind.FLOATING_LITERAL:
         token = next(cursor.get_tokens(), None)
-        return float(token.spelling) if token else 0.0
+        if token:
+            if token.spelling[-1].isalpha():
+                return float(token.spelling[:-1])
+            return float(token.spelling)
+        return 0.0
     if cursor.kind == clang.CursorKind.CHARACTER_LITERAL:
         token = next(cursor.get_tokens(), None)
         return token.spelling if token else "\0"
