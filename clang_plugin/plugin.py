@@ -1034,8 +1034,8 @@ def pretty_str(something, indent = 0):
 
 
 
-def collect_functions():
-    global_scope = CppGlobalScope.INSTANCE
+def collect_functions(scope = None):
+    global_scope = scope or CppGlobalScope.INSTANCE
     all_functions = list(global_scope.functions)
     for n in global_scope.namespaces:
         all_functions.extend(n.functions)
