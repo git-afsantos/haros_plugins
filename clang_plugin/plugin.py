@@ -41,7 +41,7 @@ def file_analysis(iface, scope):
     pubs = set()
     for c in data:
         for var in c.spin_rate:
-            spinners[var[0], var[1]]
+            spinners[var[0]] = var[1]
         for var in c.subscribe:
             subs.add(var[0])
             if isinstance(var[1], (int, long)):
