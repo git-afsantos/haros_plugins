@@ -65,7 +65,7 @@ def _read_cmake(cmake_path):
             for line in f:
                 line = line.strip()
                 if dirs is None and line.startswith("include_directories("):
-                    dirs = []
+                    dirs = list(_DEFAULT_INCLUDES)
                     line = line[20:]
                 if not dirs is None:
                     tokens = line.split(")")
