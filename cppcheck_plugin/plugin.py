@@ -52,7 +52,8 @@ def package_analysis(iface, scope):
     finally:
         FNULL.close()
         output.close()
-    files   = file_mapping(scope)
+    files   = {f.get_path(): f.id for f in scope.source_files \
+                                  if f.language == "cpp"}
     xml     = ET.parse(scope.id + ".xml").getroot()
     errors  = xml.find("errors")
     for error in errors:
@@ -69,11 +70,3 @@ def handle_report(iface, files, error):
             line = int(location.get("line", default = "0"))
             msg = error.get("verbose", default = error.get("msg"))
             iface.report_file_violation(rule_id, msg, file_id, line = line)
-
-
-def file_mapping(pkg):
-    files = {}
-    for f in pkg.source_files:
-        if f.language == "cpp":
-            files[f.get_path()] = f.id
-    return files
