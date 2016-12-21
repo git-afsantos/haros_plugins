@@ -1,8 +1,15 @@
 
+# TODO
+# resolve references
+# references across files in the same package
+# data structures for collected data
+
 # https://github.com/llvm-mirror/clang/blob/master/bindings/python/clang/cindex.py
 
 # might be interesting
 # https://github.com/pybee-attic/sealang
+
+import os
 
 import clang.cindex as clang
 
@@ -14,20 +21,82 @@ import clang.cindex as clang
 def pre_analysis():
     clang.Config.set_library_path("/usr/lib/llvm-3.8/lib")
     index = clang.Index.create()
-    return index
+    return (index, {})
 
 
 def file_analysis(iface, scope):
-    file_path = scope.get_path()
-    unit = iface.state.parse(file_path, ["-I" + "/usr/lib/llvm-3.8/lib/clang/3.8.0/include",
-                        "-I" + "/usr/include/eigen3",
-                        "-x", "c++"]) # "-std=c++11"
+    file_path   = scope.get_path()
+    index       = iface.state[0]
+    includes    = iface.state[1]
+    _read_package_includes(scope.package, includes)
+    assert scope.package.id in includes
+    args = ["-I" + path for path in includes[scope.package.id]]
+    args.append("-x")
+    args.append("c++")
+    # args.append("-std=c++11")
+    unit = index.parse(file_path, args)
     # check for problems
     if unit.diagnostics:
         for d in unit.diagnostics:
             if d.severity >= clang.Diagnostic.Error:
                 print d
     # traverse nodes
+    data = _ast_analysis(unit, file_path)
+    _report_results(iface, data)
+
+
+###############################################################################
+# CMake Analysis
+###############################################################################
+
+_DEFAULT_INCLUDES = ["/usr/lib/llvm-3.8/lib/clang/3.8.0/include"]
+
+def _read_package_includes(package, includes):
+    if not package.id in includes:
+        cmake_path = os.path.join(package.path, "CMakeLists.txt")
+        dirs = _read_cmake(cmake_path)
+        dirs = map(lambda t: _replace_cmake_tokens(t, package.path), dirs)
+        includes[package.id] = list(set(dirs))
+
+def _read_cmake(cmake_path):
+    dirs = None
+    if os.path.isfile(cmake_path):
+        with open(cmake_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if dirs is None and line.startswith("include_directories("):
+                    dirs = []
+                    line = line[20:]
+                if not dirs is None:
+                    tokens = line.split(")")
+                    dirs.extend(tokens[0].split())
+                    if len(tokens) > 1:
+                        break
+    return dirs or _DEFAULT_INCLUDES
+
+_REPLACEMENTS = {
+    "catkin":   "/home/andre/catkin_ws/devel/include",
+    #"Boost":    "/usr/include",
+    "EIGEN":    "/usr/include/eigen3"
+}
+
+def _replace_cmake_tokens(token, pkg_path = ""):
+    token = token.replace("${PROJECT_SOURCE_DIR}/", "")
+    if token[0] == "$" and token.endswith("_INCLUDE_DIRS}"):
+        component = token[2:-14]
+        if component in _REPLACEMENTS:
+            return _REPLACEMENTS[component]
+        else:
+            return _REPLACEMENTS["catkin"]
+    return os.path.join(pkg_path, token)
+
+
+
+###############################################################################
+# Analyser
+###############################################################################
+
+def _ast_analysis(unit, file_path):
     cursor = unit.cursor
     # we cannot reuse the same instance of global scope, or else we get stuff
     # from other files mixed in
@@ -36,49 +105,71 @@ def file_analysis(iface, scope):
         if node.location.file and node.location.file.name == file_path:
             global_scope.add_from_cursor(node)
     data = [FunctionCollector(f) for f in collect_functions(global_scope)]
-    spinners = {}
-    subs = set()
-    ads = {}
-    advars = set()
-    pubs = set()
-    for c in data:
-        for var in c.spin_rate:
-            spinners[var[0]] = var[1]
-        for var in c.subscribe:
-            subs.add(var[0])
-            if isinstance(var[1], (int, long)):
-                iface.report_metric("queue_size", var[1],
-                                    line = var[5].line, function = c.function)
-            iface.report_metric("subscribe_nesting", var[3],
-                                line = var[5].line, function = c.function)
-        for var in c.advertise:
-            if var[4]:
-                advars.add(var[4])
-            ads[var[0]] = var
-            if isinstance(var[1], (int, long)):
-                iface.report_metric("queue_size", var[1],
-                                    line = var[5].line, function = c.function)
-            iface.report_metric("advertise_nesting", var[3],
-                                line = var[5].line, function = c.function)
-    for c in data:
-        for r in c.publish:
-            if r[0] in advars:
-                pubs.add(r[0])
-            iface.report_metric("publish_nesting", r[1],
-                                line = r[2].line, function = c.function)
-        for r in c.sleep:
-            if r in spinners:
-                if isinstance(spinners[r], (int, long)):
-                    iface.report_metric("spin_rate", spinners[r],
-                                        function = c.function)
-    iface.report_metric("subscribers", len(subs))
-    iface.report_metric("advertisers", len(ads))
-    iface.report_metric("publishers", len(pubs))
+    return FileCollector(data)
 
 
-###############################################################################
-# Analyser
-###############################################################################
+def _report_results(iface, data):
+    iface.report_metric("subscribers", len(data.subscribe))
+    iface.report_metric("publishers", len(data.advertise))
+    iface.report_metric("active_publishers", len(data.publish))
+    for topic, datum in data.subscribe.iteritems():
+        var = datum[0]
+        col = datum[1]
+        iface.report_metric("subscribe_nesting", var[3],
+                            line = var[5].line, function = col.function)
+        if isinstance(var[1], (int, long)):
+            iface.report_metric("queue_size", var[1],
+                                line = var[5].line, function = col.function)
+    for topic, datum in data.advertise.iteritems():
+        var = datum[0]
+        col = datum[1]
+        iface.report_metric("advertise_nesting", var[3],
+                            line = var[5].line, function = col.function)
+        if isinstance(var[1], (int, long)):
+            iface.report_metric("queue_size", var[1],
+                                line = var[5].line, function = col.function)
+    for var, datum in data.publish.iteritems():
+        call = datum[0]
+        col = datum[1]
+        iface.report_metric("publish_nesting", call[1],
+                            line = call[2].line, function = col.function)
+    for var, datum in data.spin_rate.iteritems():
+        value = datum[0][1]
+        col = datum[1]
+        if isinstance(value, (int, long)):
+            iface.report_metric("spin_rate", value, function = col.function)
+
+
+class FileCollector(object):
+    def __init__(self, function_collectors):
+        self.subscribe      = {}
+        self.subscribers    = {}
+        self.advertise      = {}
+        self.publish        = {}
+        self.publishers     = {}
+        self.spin_rate      = {}
+        self._collect(function_collectors)
+
+    def _collect(self, function_collectors):
+        spin_rate = {}
+        for c in function_collectors:
+            for var in c.spin_rate:
+                spin_rate[var[0]] = (var, c)
+            for var in c.subscribe:
+                self.subscribe[var[0]] = (var, c)
+                if var[4]:
+                    self.subscribers[var[4]] = var[0]
+            for var in c.advertise:
+                self.advertise[var[0]] = (var, c)
+                if var[4]:
+                    self.publishers[var[4]] = var[0]
+        for c in function_collectors:
+            for call in c.publish:
+                if call[0] in self.publishers:
+                    self.publish[call[0]] = (call, c)
+            for var in c.sleep:
+                if var in spin_rate:
+                    self.spin_rate[var] = spin_rate[var]
 
 
 class FunctionCollector(object):

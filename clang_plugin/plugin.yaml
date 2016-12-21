@@ -20,7 +20,7 @@ metrics:
         description: Number of levels of control flow wrapping a subscription.
         scope: file
         min: 0
-    advertisers:
+    publishers:
         name: Number of Advertisements
         description: Number of topics a node advertises.
         scope: file
@@ -30,7 +30,7 @@ metrics:
         description: Number of levels of control flow wrapping an advertisement.
         scope: file
         min: 0
-    publishers:
+    active_publishers:
         name: Number of Publications
         description: Number of topics a node publishes to.
         scope: file
@@ -49,8 +49,8 @@ supported_metrics:
     - spin_rate
     - subscribers
     - subscribe_nesting
-    - advertisers
-    - advertise_nesting
     - publishers
+    - advertise_nesting
+    - active_publishers
     - publish_nesting
     - queue_size
