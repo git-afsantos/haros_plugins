@@ -49,7 +49,8 @@ def file_analysis(iface, scope):
 # CMake Analysis
 ###############################################################################
 
-_DEFAULT_INCLUDES = ["/usr/lib/llvm-3.8/lib/clang/3.8.0/include"]
+_DEFAULT_INCLUDES = ["/usr/lib/llvm-3.8/lib/clang/3.8.0/include",
+                     "/usr/include/eigen3"]
 
 def _read_package_includes(package, includes):
     if not package.id in includes:
@@ -76,18 +77,18 @@ def _read_cmake(cmake_path):
 
 _REPLACEMENTS = {
     "catkin":   "/home/andre/catkin_ws/devel/include",
-    #"Boost":    "/usr/include",
-    "EIGEN":    "/usr/include/eigen3"
 }
 
 def _replace_cmake_tokens(token, pkg_path = ""):
     token = token.replace("${PROJECT_SOURCE_DIR}/", "")
-    if token[0] == "$" and token.endswith("_INCLUDE_DIRS}"):
-        component = token[2:-14]
-        if component in _REPLACEMENTS:
-            return _REPLACEMENTS[component]
-        else:
-            return _REPLACEMENTS["catkin"]
+    if token[0] == "$" :
+        if token.endswith("_INCLUDE_DIRS}"):
+            component = token[2:-14]
+            if component in _REPLACEMENTS:
+                return _REPLACEMENTS[component]
+            else:
+                return _REPLACEMENTS["catkin"]
+        return _REPLACEMENTS["catkin"]
     return os.path.join(pkg_path, token)
 
 
@@ -1024,7 +1025,7 @@ def _parse(cursor, **options):
         return cursor.spelling
     if cursor.kind == clang.CursorKind.INTEGER_LITERAL:
         token = next(cursor.get_tokens(), None)
-        return int(token.spelling) if token else 0
+        return int(token.spelling, 0) if token else 0
     if cursor.kind == clang.CursorKind.FLOATING_LITERAL:
         token = next(cursor.get_tokens(), None)
         if token:
