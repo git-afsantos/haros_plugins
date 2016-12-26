@@ -2,7 +2,6 @@
 # TODO
 # resolve references
 # references across files in the same package
-# data structures for collected data
 
 # https://github.com/llvm-mirror/clang/blob/master/bindings/python/clang/cindex.py
 
@@ -12,6 +11,8 @@
 import os
 
 import clang.cindex as clang
+
+from collections import namedtuple
 
 
 ###############################################################################
@@ -113,76 +114,108 @@ def _report_results(iface, data):
     iface.report_metric("subscribers", len(data.subscribe))
     iface.report_metric("publishers", len(data.advertise))
     iface.report_metric("active_publishers", len(data.publish))
+    iface.report_metric("service_servers", len(data.advertise_service))
+    iface.report_metric("service_clients", len(data.service_client))
     for topic, datum in data.subscribe.iteritems():
-        var = datum[0]
-        col = datum[1]
-        iface.report_metric("subscribe_nesting", var[3],
-                            line = var[5].line, function = col.function)
-        if isinstance(var[1], (int, long)):
-            iface.report_metric("queue_size", var[1],
-                                line = var[5].line, function = col.function)
+        iface.report_metric("subscribe_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
+        if isinstance(datum.queue_size, (int, long)):
+            iface.report_metric("queue_size", datum.queue_size,
+                                line = datum.line, function = datum.function)
     for topic, datum in data.advertise.iteritems():
-        var = datum[0]
-        col = datum[1]
-        iface.report_metric("advertise_nesting", var[3],
-                            line = var[5].line, function = col.function)
-        if isinstance(var[1], (int, long)):
-            iface.report_metric("queue_size", var[1],
-                                line = var[5].line, function = col.function)
+        iface.report_metric("advertise_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
+        if isinstance(datum.queue_size, (int, long)):
+            iface.report_metric("queue_size", datum.queue_size,
+                                line = datum.line, function = datum.function)
     for var, datum in data.publish.iteritems():
-        call = datum[0]
-        col = datum[1]
-        iface.report_metric("publish_nesting", call[1],
-                            line = call[2].line, function = col.function)
+        iface.report_metric("publish_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
+    for topic, datum in data.advertise_service.iteritems():
+        iface.report_metric("advertise_service_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
+    for topic, datum in data.service_client.iteritems():
+        iface.report_metric("service_client_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
     for var, datum in data.spin_rate.iteritems():
-        value = datum[0][1]
-        col = datum[1]
-        if isinstance(value, (int, long)):
-            iface.report_metric("spin_rate", value, function = col.function)
+        if isinstance(datum.rate, (int, long)):
+            iface.report_metric("spin_rate", datum.rate,
+                                function = datum.function)
+
+
+SubscribeTuple = namedtuple("SubscribeTuple",
+                            ["topic", "queue_size", "callback",
+                             "nesting", "variable", "function", "line"])
+
+AdvertiseTuple = namedtuple("AdvertiseTuple",
+                            ["topic", "queue_size", "message_type",
+                             "nesting", "variable", "function", "line"])
+
+PublishTuple = namedtuple("PublishTuple",
+                          ["variable", "nesting", "function", "line"])
+
+AdvertiseServiceTuple = namedtuple("AdvertiseServiceTuple",
+                                   ["topic", "callback", "nesting",
+                                    "variable", "function", "line"])
+
+ServiceClientTuple = namedtuple("ServiceClientTuple",
+                                ["topic", "message_type", "nesting",
+                                 "variable", "function", "line"])
+
+SpinRateTuple = namedtuple("SpinRateTuple",
+                           ["rate", "variable", "function", "line"])
 
 
 class FileCollector(object):
     def __init__(self, function_collectors):
-        self.subscribe      = {}
-        self.subscribers    = {}
-        self.advertise      = {}
-        self.publish        = {}
-        self.publishers     = {}
-        self.spin_rate      = {}
+        self.subscribe          = {}
+        self.subscribers        = {}
+        self.advertise          = {}
+        self.publish            = {}
+        self.publishers         = {}
+        self.advertise_service  = {}
+        self.servers            = {}
+        self.service_client     = {}
+        self.clients            = {}
+        self.spin_rate          = {}
         self._collect(function_collectors)
 
     def _collect(self, function_collectors):
-        spin_rate = {}
         for c in function_collectors:
             for var in c.spin_rate:
-                spin_rate[var[0]] = (var, c)
+                self.spin_rate[var.variable] = var
             for var in c.subscribe:
-                self.subscribe[var[0]] = (var, c)
-                if var[4]:
-                    self.subscribers[var[4]] = var[0]
+                self.subscribe[var.topic] = var
+                if var.variable:
+                    self.subscribers[var.variable] = var.topic
             for var in c.advertise:
-                self.advertise[var[0]] = (var, c)
-                if var[4]:
-                    self.publishers[var[4]] = var[0]
+                self.advertise[var.topic] = var
+                if var.variable:
+                    self.publishers[var.variable] = var.topic
+            for var in c.advertise_service:
+                self.advertise_service[var.topic] = var
+                if var.variable:
+                    self.servers[var.variable] = var.topic
+            for var in c.service_client:
+                self.service_client[var.topic] = var
+                if var.variable:
+                    self.clients[var.variable] = var.topic
         for c in function_collectors:
             for call in c.publish:
-                if call[0] in self.publishers:
-                    self.publish[call[0]] = (call, c)
-            for var in c.sleep:
-                if var in spin_rate:
-                    self.spin_rate[var] = spin_rate[var]
+                if call.variable in self.publishers:
+                    self.publish[call.variable] = call
 
 
 class FunctionCollector(object):
     def __init__(self, function):
         assert isinstance(function, CppFunction)
-        self.function   = function.name
-        self.subscribe  = []
-        self.advertise  = []
-        self.publish    = []
-        self.spin_rate  = []
-        self.sleep      = []
-        self.spin       = []
+        self.function           = function.name
+        self.subscribe          = []
+        self.advertise          = []
+        self.publish            = []
+        self.advertise_service  = []
+        self.service_client     = []
+        self.spin_rate          = []
         for statement in function.body.body:
             self._collect(statement)
 
@@ -201,9 +234,12 @@ class FunctionCollector(object):
         if variable.result == "ros::Rate":
             if isinstance(variable.value, CppFunctionCall):
                 value = variable.value.arguments[0]
-                self.spin_rate.append((name, value))
+                o = SpinRateTuple(value, name, self.function, variable.line)
+                self.spin_rate.append(o)
         elif variable.result == "ros::Publisher" \
-                or variable.result == "ros::Subscriber":
+                or variable.result == "ros::Subscriber" \
+                or variable.result == "ros::ServiceServer" \
+                or variable.result == "ros::ServiceClient":
             if isinstance(variable.value, CppFunctionCall):
                 self._from_call(variable.value, nesting, variable = name)
 
@@ -215,35 +251,39 @@ class FunctionCollector(object):
                                 variable = call.arguments[0].name)
             return
         if name == "advertise" and call.result == "ros::Publisher":
-            # topic, queue size, message type, nesting, variable
-            self.advertise.append((call.arguments[0], call.arguments[1],
-                                   call.template, nesting, variable, call))
+            o = AdvertiseTuple(call.arguments[0], call.arguments[1],
+                               call.template, nesting, variable,
+                               self.function, call.line)
+            self.advertise.append(o)
         elif name == "subscribe" and call.result == "ros::Subscriber":
             callback = call.arguments[2]
             if isinstance(callback, CppOperator) and callback.is_unary:
                 callback = callback.arguments[0]
-            # topic, queue size, callback, nesting, variable
-            self.subscribe.append((call.arguments[0], call.arguments[1],
-                                   callback.name, nesting, variable, call))
-        elif name == "publish" \
+            o = SubscribeTuple(call.arguments[0], call.arguments[1],
+                               callback.name, nesting, variable,
+                               self.function, call.line)
+            self.subscribe.append(o)
+        elif name == "publish" and call.method_of \
                 and call.method_of.result == "ros::Publisher":
-            # publisher, nesting
-            self.publish.append((call.method_of.name, nesting, call))
-        elif name == "sleep" and call.method_of.result == "ros::Rate":
-            self.sleep.append(call.method_of.name)
+            o = PublishTuple(call.method_of.name, nesting,
+                             self.function, call.line)
+            self.publish.append(o)
+        elif name == "advertiseService" and call.result == "ros::ServiceServer":
+            callback = call.arguments[1]
+            if isinstance(callback, CppOperator) and callback.is_unary:
+                callback = callback.arguments[0]
+            o = AdvertiseServiceTuple(call.arguments[0], callback.name, nesting,
+                                      variable, self.function, call.line)
+            self.advertise_service.append(o)
+        elif name == "serviceClient" and call.result == "ros::ServiceClient":
+            o = ServiceClientTuple(call.arguments[0], call.template, nesting,
+                                   variable, self.function, call.line)
+            self.service_client.append(o)
 
     def has_results(self):
-        for r in self.subscribe:
-            return True
-        for r in self.advertise:
-            return True
-        for r in self.publish:
-            return True
-        for r in self.spin_rate:
-            return True
-        for r in self.sleep:
-            return True
-        return False
+        return self.subscribe or self.advertise or self.publish \
+                or self.advertise_service or self.service_client \
+                or self.spin_rate
 
     def show_results(self):
         for r in self.subscribe:
@@ -252,10 +292,12 @@ class FunctionCollector(object):
             print "[{}] {} = advertise<{}>({}, {})".format(r[3], r[4], r[2], r[0], r[1])
         for r in self.publish:
             print "[{}] {}.publish()".format(r[1], r[0])
+        for r in self.advertise_service:
+            print "[{}] {} = advertiseService({}, {})".format(r[2], r[3], r[0], r[1])
+        for r in self.service_client:
+            print "[{}] {} = serviceClient<{}>({})".format(r[2], r[3], r[1], r[0])
         for r in self.spin_rate:
             print r[0] + " spinning at " + str(r[1]) + "Hz"
-        for r in self.sleep:
-            print r + ".sleep()"
 
 
 

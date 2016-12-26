@@ -40,6 +40,26 @@ metrics:
         description: Number of levels of control flow wrapping a publication.
         scope: file
         min: 0
+    service_servers:
+        name: Number of Service Servers
+        description: Number of services a node hosts.
+        scope: file
+        min: 0
+    advertise_service_nesting:
+        name: Level of Service Advertisement Nesting
+        description: Number of levels of control flow wrapping a service advertisement.
+        scope: file
+        min: 0
+    service_clients:
+        name: Number of Service Clients
+        description: Number of services a node uses.
+        scope: file
+        min: 0
+    service_client_nesting:
+        name: Level of Service Client Nesting
+        description: Number of levels of control flow wrapping a service client.
+        scope: file
+        min: 0
     queue_size:
         name: Size of Topic Queue
         description: Size given to a topic queue.
@@ -53,4 +73,8 @@ supported_metrics:
     - advertise_nesting
     - active_publishers
     - publish_nesting
+    - service_servers
+    - advertise_service_nesting
+    - service_clients
+    - service_client_nesting
     - queue_size
