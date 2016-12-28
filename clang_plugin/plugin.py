@@ -74,18 +74,37 @@ def _read_cmake(cmake_path):
     all_dirs = list(_DEFAULT_INCLUDES)
     if os.path.isfile(cmake_path):
         with open(cmake_path, "r") as f:
-            dirs = None
+            idirs = None    # include_directories
+            cdirs = None    # catkin_package
             for line in f:
                 line = line.strip()
-                if dirs is None and line.startswith("include_directories("):
-                    dirs = []
+                if idirs is None and line.startswith("include_directories("):
+                    idirs = []
                     line = line[20:]
-                if not dirs is None:
+                if not idirs is None:
                     tokens = line.split(")")
-                    dirs.extend(tokens[0].split())
+                    idirs.extend(tokens[0].split())
                     if len(tokens) > 1:
-                        all_dirs.extend(dirs)
-                        dirs = None
+                        all_dirs.extend(idirs)
+                        idirs = None
+                        continue
+                if cdirs is None and line.startswith("catkin_package("):
+                    cdirs = []
+                    line = line[15:]
+                if not cdirs is None:
+                    tokens = line.split(")")
+                    cdirs.extend(tokens[0].split())
+                    if len(tokens) > 1:
+                        flag = False
+                        stop_at = ("LIBRARIES", "CATKIN_DEPENDS", "DEPENDS", "CFG_EXTRAS")
+                        for d in cdirs:
+                            if d in stop_at:
+                                flag = False
+                            elif flag:
+                                all_dirs.append(d)
+                            elif d == "INCLUDE_DIRS":
+                                flag = True
+                        cdirs = None
                         continue
     return all_dirs
 
