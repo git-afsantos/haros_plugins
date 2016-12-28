@@ -654,10 +654,13 @@ class CppControlFlow(CppBasicEntity):
 
     def _parse_for(self, cursor):
         children = list(cursor.get_children())
-        assert len(children) >= 2
+        assert len(children) >= 1
         # body always comes last
         body = CppBlock.from_cursor(children[-1], scope = self)
-        if len(children) == 2:
+        if len(children) == 1:
+            # just body
+            condition = True
+        elif len(children) == 2:
             # condition + body
             condition = _parse(children[0], scope = self.scope)
         elif len(children) >= 4:
