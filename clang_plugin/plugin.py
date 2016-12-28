@@ -29,7 +29,7 @@ def file_analysis(iface, scope):
     file_path   = scope.get_path()
     index       = iface.state[0]
     includes    = iface.state[1]
-    _read_package_includes(scope.package, includes)
+    _find_includes(iface, scope.package, includes)
     assert scope.package.id in includes
     args = ["-I" + path for path in includes[scope.package.id]]
     args.append("-x")
@@ -53,12 +53,22 @@ def file_analysis(iface, scope):
 _DEFAULT_INCLUDES = ["/usr/lib/llvm-3.8/lib/clang/3.8.0/include",
                      "/usr/include/eigen3"]
 
-def _read_package_includes(package, includes):
-    if not package.id in includes:
-        cmake_path = os.path.join(package.path, "CMakeLists.txt")
-        dirs = _read_cmake(cmake_path)
-        dirs = map(lambda t: _replace_cmake_tokens(t, package.path), dirs)
-        includes[package.id] = list(set(dirs))
+def _find_includes(iface, package, includes):
+    if package.id in includes:
+        return
+    includes[package.id] = _read_package_includes(package)
+    for id in package.dependencies:
+        dep = iface.find_package(id)
+        if dep:
+            _find_includes(iface, dep, includes)
+            includes[package.id].extend(includes[dep.id])
+    includes[package.id] = list(set(includes[package.id]))
+
+
+def _read_package_includes(package):
+    cmake_path = os.path.join(package.path, "CMakeLists.txt")
+    dirs = _read_cmake(cmake_path)
+    return map(lambda t: _replace_cmake_tokens(t, package.path), dirs)
 
 def _read_cmake(cmake_path):
     dirs = None
