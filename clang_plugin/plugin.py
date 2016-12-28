@@ -71,20 +71,23 @@ def _read_package_includes(package):
     return map(lambda t: _replace_cmake_tokens(t, package.path), dirs)
 
 def _read_cmake(cmake_path):
-    dirs = None
+    all_dirs = list(_DEFAULT_INCLUDES)
     if os.path.isfile(cmake_path):
         with open(cmake_path, "r") as f:
+            dirs = None
             for line in f:
                 line = line.strip()
                 if dirs is None and line.startswith("include_directories("):
-                    dirs = list(_DEFAULT_INCLUDES)
+                    dirs = []
                     line = line[20:]
                 if not dirs is None:
                     tokens = line.split(")")
                     dirs.extend(tokens[0].split())
                     if len(tokens) > 1:
-                        break
-    return dirs or _DEFAULT_INCLUDES
+                        all_dirs.extend(dirs)
+                        dirs = None
+                        continue
+    return all_dirs
 
 _REPLACEMENTS = {
     "catkin":   "/home/andre/catkin_ws/devel/include",
