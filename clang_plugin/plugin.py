@@ -51,7 +51,7 @@ def file_analysis(iface, scope):
 ###############################################################################
 
 _DEFAULT_INCLUDES = ["/usr/lib/llvm-3.8/lib/clang/3.8.0/include",
-                     "/usr/include/eigen3"]
+                     "/usr/include/eigen3", "/usr/include/ImageMagick"]
 
 def _find_includes(iface, package, includes):
     if package.id in includes:
