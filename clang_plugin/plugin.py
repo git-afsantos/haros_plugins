@@ -265,8 +265,10 @@ class FunctionCollector(object):
         name = variable.name
         if variable.result == "ros::Rate":
             if isinstance(variable.value, CppFunctionCall):
-                value = variable.value.arguments[0] \
-                        if variable.value.arguments else 0
+                if len(variable.value.arguments) > 0:
+                    value = variable.value.arguments[0]
+                else:
+                    value = 0
                 o = SpinRateTuple(value, name, self.function, variable.line)
                 self.spin_rate.append(o)
         elif variable.result == "ros::Publisher" \
