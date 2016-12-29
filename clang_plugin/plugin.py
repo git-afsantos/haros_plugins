@@ -1106,6 +1106,8 @@ def _parse(cursor, **options):
     if cursor.kind == clang.CursorKind.INTEGER_LITERAL:
         token = next(cursor.get_tokens(), None)
         if token:
+            if token.spelling.startswith("0x"):
+                return int(token.spelling, 16)
             if token.spelling[-1].isalpha():
                 if token.spelling[-2].isalpha():
                     return int(token.spelling[:-2], 0)
