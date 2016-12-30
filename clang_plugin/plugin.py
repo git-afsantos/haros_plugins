@@ -388,7 +388,7 @@ class LazyCppEntity(object):
         self.cursor = cursor
 
     def evaluate(self):
-        return _parse(self.cursor, scope = self.scope, lazy = True)
+        return _parse(self.cursor, scope = self.scope, lazy = False)
 
     def pretty_str(self, indent = 0):
         return (" " * indent) + self.__str__()
