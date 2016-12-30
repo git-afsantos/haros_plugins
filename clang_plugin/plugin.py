@@ -293,6 +293,8 @@ class FunctionCollector(object):
             self.advertise.append(o)
         elif name == "subscribe" and call.result == "ros::Subscriber":
             callback = call.arguments[2]
+            if isinstance(callback, LazyCppEntity):
+                callback = callback.evaluate()
             if isinstance(callback, CppOperator) and callback.is_unary:
                 callback = callback.arguments[0]
             o = SubscribeTuple(call.arguments[0], call.arguments[1],
@@ -306,6 +308,8 @@ class FunctionCollector(object):
             self.publish.append(o)
         elif name == "advertiseService" and call.result == "ros::ServiceServer":
             callback = call.arguments[1]
+            if isinstance(callback, LazyCppEntity):
+                callback = callback.evaluate()
             if isinstance(callback, CppOperator) and callback.is_unary:
                 callback = callback.arguments[0]
             o = AdvertiseServiceTuple(call.arguments[0], callback.name, nesting,
@@ -376,6 +380,24 @@ class CppBasicEntity(object):
 
     def __repr__(self):
         return "[unknown]"
+
+
+class LazyCppEntity(object):
+    def __init__(self, scope, cursor):
+        self.scope  = scope
+        self.cursor = cursor
+
+    def evaluate(self):
+        return _parse(self.cursor, scope = self.scope, lazy = True)
+
+    def pretty_str(self, indent = 0):
+        return (" " * indent) + self.__str__()
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return "[LazyCppEntity]"
 
 
 
@@ -459,15 +481,15 @@ class CppOperator(CppExpression):
         if cursor.kind == clang.CursorKind.UNARY_OPERATOR:
             self.name       = CppOperator._parse_unary(cursor)
             arg             = next(cursor.get_children())
-            self.arguments  = (_parse(arg, scope = self.scope),)
+            self.arguments  = (_parse(arg, scope = self.scope, lazy = True),)
             self.is_unary   = True
             self.is_binary  = False
         else:
             self.name       = CppOperator._parse_binary(cursor)
             args            = list(cursor.get_children())
             assert len(args) >= 2
-            self.arguments  = (_parse(args[0], scope = self.scope),
-                               _parse(args[1], scope = self.scope))
+            self.arguments  = (_parse(args[0], scope = self.scope, lazy = True),
+                               _parse(args[1], scope = self.scope, lazy = True))
             self.is_unary   = False
             self.is_binary  = True
 
@@ -547,8 +569,8 @@ class CppFunctionCall(CppExpression):
             self._parse_non_arguments(children)
             if not args and self.is_constructor:
                 args = children
-            self.arguments = [_parse(arg, scope = self.scope,
-                                     arguments = True) for arg in args]
+            self.arguments = [_parse(arg, scope = self.scope, arguments = True,
+                                     lazy = True) for arg in args]
         else:
             child = next(cursor.get_children(), None)
             if child:
@@ -634,7 +656,7 @@ class CppControlFlow(CppBasicEntity):
     def _parse_if(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[0], scope = self.scope)
+        condition = _parse(children[0], scope = self.scope, lazy = True)
         body = CppBlock.from_cursor(children[1], scope = self.scope)
         branches = [(condition, body)]
         if len(children) >= 3:
@@ -649,7 +671,7 @@ class CppControlFlow(CppBasicEntity):
         # switch is hard to parse, this is neither correct nor pretty
         children = list(cursor.get_children())
         assert len(children) >= 2
-        var = _parse(children[0], scope = self.scope)
+        var = _parse(children[0], scope = self.scope, lazy = True)
         assert children[1].kind == clang.CursorKind.COMPOUND_STMT
         branches = []
         condition = True
@@ -660,7 +682,7 @@ class CppControlFlow(CppBasicEntity):
                     branches.append((condition, body))
                 statements = list(node.get_children())
                 body = CppBlock(self)
-                value = _parse(statements[0], scope = self.scope)
+                value = _parse(statements[0], scope = self.scope, lazy = True)
                 condition = CppOperator(self.scope, "==", "bool", (var, value))
                 for statement in statements[1:]:
                     body.append_statement(_parse(statement, scope = body))
@@ -690,33 +712,33 @@ class CppControlFlow(CppBasicEntity):
             condition = True
         elif len(children) == 2:
             # condition + body
-            condition = _parse(children[0], scope = self.scope)
+            condition = _parse(children[0], scope = self.scope, lazy = True)
         elif len(children) >= 4:
             # var + condition + increment + body
-            condition = _parse(children[1], scope = self)
+            condition = _parse(children[1], scope = self, lazy = True)
             body.append_statement(_parse(children[2], scope = body))
             self.variables.append(_parse(children[0], scope = self))
         elif children[0].kind == clang.CursorKind.DECL_STMT:
             # var + condition + body
-            condition = _parse(children[1], scope = self)
+            condition = _parse(children[1], scope = self, lazy = True)
             self.variables.append(_parse(children[0], scope = self))
         else:
             # condition + increment + body
-            condition = _parse(children[0], scope = self.scope)
+            condition = _parse(children[0], scope = self.scope, lazy = True)
             body.append_statement(_parse(children[1], scope = body))
         return [(condition, body)]
 
     def _parse_while(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[0], scope = self.scope)
+        condition = _parse(children[0], scope = self.scope, lazy = True)
         body = CppBlock.from_cursor(children[1], scope = self.scope)
         return [(condition, body)]
 
     def _parse_do(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[1], scope = self.scope)
+        condition = _parse(children[1], scope = self.scope, lazy = True)
         body = CppBlock.from_cursor(children[0], scope = self.scope)
         return [(condition, body)]
 
@@ -788,7 +810,7 @@ class CppStatement(CppBasicEntity):
         if cursor.kind == clang.CursorKind.RETURN_STMT:
             self.name   = "return"
             expression  = next(cursor.get_children(), None)
-            self.value  = _parse(expression, scope = self.scope) \
+            self.value  = _parse(expression, scope = self.scope, lazy = True) \
                           if expression else None
         elif cursor.kind == clang.CursorKind.BREAK_STMT:
             self.name   = "break"
@@ -867,7 +889,7 @@ class CppVariable(CppBasicEntity):
         self.result = cursor.type.spelling
         children = list(cursor.get_children())
         if children and children[-1].kind != clang.CursorKind.TYPE_REF:
-            self.value = _parse(children[-1], scope = self.scope)
+            self.value = _parse(children[-1], scope = self.scope, lazy = True)
 
     def pretty_str(self, indent = 0):
         indent = " " * indent
@@ -930,7 +952,7 @@ class CppFunction(CppNamedEntity):
             elif c.kind == clang.CursorKind.MEMBER_REF:
                 # This is for constructors, we need the sibling
                 member = CppReference.from_cursor(c, scope = self)
-                value = _parse(next(children), scope = self)
+                value = _parse(next(children), scope = self, lazy = True)
                 result = member.result
                 assignment = CppOperator(self, "=", result, (member, value))
                 self.body.append_statement(assignment)
@@ -1156,7 +1178,9 @@ def _parse(cursor, **options):
     if cursor.kind == clang.CursorKind.UNARY_OPERATOR \
             or cursor.kind == clang.CursorKind.BINARY_OPERATOR \
             or cursor.kind == clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR:
-        return CppOperator.from_cursor(cursor, scope = scope)
+        if not options.get("lazy", False):
+            return CppOperator.from_cursor(cursor, scope = scope)
+        return LazyCppEntity(scope, cursor)
     if cursor.kind == clang.CursorKind.RETURN_STMT \
             or cursor.kind == clang.CursorKind.BREAK_STMT \
             or cursor.kind == clang.CursorKind.CONTINUE_STMT:
