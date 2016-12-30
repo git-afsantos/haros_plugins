@@ -1143,13 +1143,10 @@ def _parse(cursor, **options):
     if cursor.kind == clang.CursorKind.INTEGER_LITERAL:
         token = next(cursor.get_tokens(), None)
         if token:
-            if token.spelling.startswith("0x"):
-                return int(token.spelling, 16)
-            if token.spelling[-1].isalpha():
-                if token.spelling[-2].isalpha():
-                    return int(token.spelling[:-2], 0)
-                return int(token.spelling[:-1], 0)
-            return int(token.spelling, 0)
+            token = token.spelling
+            while token.endswith(("U", "u", "L", "l")):
+                token = token[:-1]
+            return int(token, 0)
         return 0
     if cursor.kind == clang.CursorKind.FLOATING_LITERAL:
         token = next(cursor.get_tokens(), None)
