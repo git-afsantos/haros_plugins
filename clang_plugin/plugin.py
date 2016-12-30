@@ -12,6 +12,7 @@ import os
 
 import clang.cindex as clang
 
+from ctypes import ArgumentError
 from collections import namedtuple
 
 
@@ -354,9 +355,14 @@ class CppBasicEntity(object):
         return node
 
     def _read_cursor(self, cursor):
-        self.file   = cursor.location.file.name
-        self.line   = cursor.location.line
-        self.column = cursor.location.column
+        try:
+            self.file   = cursor.location.file.name
+            self.line   = cursor.location.line
+            self.column = cursor.location.column
+        except ArgumentError as e:
+            self.file   = None
+            self.line   = None
+            self.column = None
 
     def _traverse(self, cursor):
         for child in cursor.get_children():
