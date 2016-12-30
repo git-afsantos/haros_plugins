@@ -282,19 +282,20 @@ class FunctionCollector(object):
     def _from_call(self, call, nesting, variable = None):
         name = call.name
         if name == "operator=":
+            call.simplify()
             if isinstance(call.arguments[1], CppFunctionCall):
                 self._from_call(call.arguments[1], nesting,
                                 variable = call.arguments[0].name)
             return
         if name == "advertise" and call.result == "ros::Publisher":
+            call.simplify()
             o = AdvertiseTuple(call.arguments[0], call.arguments[1],
                                call.template, nesting, variable,
                                self.function, call.line)
             self.advertise.append(o)
         elif name == "subscribe" and call.result == "ros::Subscriber":
+            call.simplify()
             callback = call.arguments[2]
-            if isinstance(callback, LazyCppEntity):
-                callback = callback.evaluate()
             if isinstance(callback, CppOperator) and callback.is_unary:
                 callback = callback.arguments[0]
             o = SubscribeTuple(call.arguments[0], call.arguments[1],
@@ -303,19 +304,20 @@ class FunctionCollector(object):
             self.subscribe.append(o)
         elif name == "publish" and call.method_of \
                 and call.method_of.result == "ros::Publisher":
+            call.simplify()
             o = PublishTuple(call.method_of.name, nesting,
                              self.function, call.line)
             self.publish.append(o)
         elif name == "advertiseService" and call.result == "ros::ServiceServer":
+            call.simplify()
             callback = call.arguments[1]
-            if isinstance(callback, LazyCppEntity):
-                callback = callback.evaluate()
             if isinstance(callback, CppOperator) and callback.is_unary:
                 callback = callback.arguments[0]
             o = AdvertiseServiceTuple(call.arguments[0], callback.name, nesting,
                                       variable, self.function, call.line)
             self.advertise_service.append(o)
         elif name == "serviceClient" and call.result == "ros::ServiceClient":
+            call.simplify()
             o = ServiceClientTuple(call.arguments[0], call.template, nesting,
                                    variable, self.function, call.line)
             self.service_client.append(o)
@@ -592,6 +594,13 @@ class CppFunctionCall(CppExpression):
                     template.append(cursor.spelling)
             if template:
                 self.template = "::".join(template)
+
+    def simplify(self):
+        i = 0
+        while i < len(self.arguments):
+            if isinstance(self.arguments[i], LazyCppEntity):
+                self.arguments[i] = self.arguments[i].evaluate()
+            i += 1
 
     def pretty_str(self, indent = 0):
         indent = " " * indent
