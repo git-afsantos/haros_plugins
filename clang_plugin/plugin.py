@@ -253,7 +253,9 @@ class FileCollector(object):
         # TODO this needs a serious rework
         for c in function_collectors:
             for sleep in c.sleep:
-                rate = self.spin_rate.get(sleep.method_of.name, 0)
+                rate = 0
+                if sleep.method_of.name in self.spin_rate:
+                    rate = self.spin_rate[sleep.method_of.name].rate
                 sleep_scope = sleep.scope
                 while isinstance(sleep_scope, CppBlock):
                     sleep_scope = sleep_scope.scope
