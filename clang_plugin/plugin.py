@@ -253,12 +253,13 @@ class FileCollector(object):
         # TODO this needs a serious rework
         for c in function_collectors:
             for sleep in c.sleep:
-                rate = self.spin_rate.get(sleep.method_of, 0)
+                rate = self.spin_rate.get(sleep.method_of.name, 0)
                 sleep_scope = sleep.scope
                 while isinstance(sleep_scope, CppBlock):
                     sleep_scope = sleep_scope.scope
                 for var, publish in self.publish.iteritems():
                     topic = self.publishers[var]
+                    # size = self.advertise[topic].queue_size
                     for p in publish:
                         pub_scope = p.scope
                         while isinstance(pub_scope, CppBlock):
