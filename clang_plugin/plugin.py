@@ -1319,12 +1319,12 @@ def analysis(file_path, index):
         if node.location.file and node.location.file.name == file_path:
             global_scope.add_from_cursor(node)
     # print global_scope.pretty_str()
-    for f in collect_functions():
-        c = FunctionCollector(f)
-        if c.has_results():
-            print "FUNCTION " + f.name + ":"
-            c.show_results()
-            print ""
+    data = [FunctionCollector(f) for f in collect_functions(global_scope)]
+    data = FileCollector(data)
+    if not data.publish_rate:
+        print "No publish rates were detected."
+    for topic, rate in data.publish_rate.iteritems():
+        print topic, "publishes at", rate, "Hz"
 
 
 
@@ -1374,9 +1374,8 @@ def print_ast(file_path, index):
 
 
 def main():
-    # file_path = "/home/andre/catkin_ws/src/beginner_tutorial/src/listener.cpp"
-    # file_path = "/home/andre/catkin_ws/src/beginner_tutorial/src/talker.cpp"
-    file_path = "/home/andre/kobuki/src/kobuki/kobuki_node/src/library/kobuki_ros.cpp"
+    file_path = "/home/andre/ros/tests/talker.cpp"
+    # file_path = "/home/andre/kobuki/src/kobuki/kobuki_node/src/library/kobuki_ros.cpp"
     clang.Config.set_library_path("/usr/lib/llvm-3.8/lib")
     index = clang.Index.create()
     # print_ast(file_path, index)
