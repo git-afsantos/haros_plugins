@@ -161,9 +161,10 @@ def _report_results(iface, data):
         if isinstance(datum.queue_size, (int, long)):
             iface.report_metric("queue_size", datum.queue_size,
                                 line = datum.line, function = datum.function)
-    for var, datum in data.publish.iteritems():
-        iface.report_metric("publish_nesting", datum.nesting,
-                            line = datum.line, function = datum.function)
+    for var, d in data.publish.iteritems():
+        for datum in d:
+            iface.report_metric("publish_nesting", datum.nesting,
+                                line = datum.line, function = datum.function)
     for topic, datum in data.advertise_service.iteritems():
         iface.report_metric("advertise_service_nesting", datum.nesting,
                             line = datum.line, function = datum.function)
@@ -185,7 +186,7 @@ AdvertiseTuple = namedtuple("AdvertiseTuple",
                              "nesting", "variable", "function", "line"])
 
 PublishTuple = namedtuple("PublishTuple",
-                          ["variable", "nesting", "function", "line"])
+                          ["variable", "nesting", "function", "line", "scope"])
 
 AdvertiseServiceTuple = namedtuple("AdvertiseServiceTuple",
                                    ["topic", "callback", "nesting",
@@ -211,9 +212,15 @@ class FileCollector(object):
         self.service_client     = {}
         self.clients            = {}
         self.spin_rate          = {}
+        self.publish_rate       = {}
         self._collect(function_collectors)
 
     def _collect(self, function_collectors):
+        self._basic_occurrences(function_collectors)
+        self._publish_occurrences(function_collectors)
+        self._publish_rates(function_collectors)
+
+    def _basic_occurrences(self, function_collectors):
         for c in function_collectors:
             for var in c.spin_rate:
                 self.spin_rate[var.variable] = var
@@ -233,10 +240,32 @@ class FileCollector(object):
                 self.service_client[var.topic] = var
                 if var.variable:
                     self.clients[var.variable] = var.topic
+
+    def _publish_occurrences(self, function_collectors):
         for c in function_collectors:
             for call in c.publish:
                 if call.variable in self.publishers:
-                    self.publish[call.variable] = call
+                    if not call.variable in self.publish:
+                        self.publish[call.variable] = []
+                    self.publish[call.variable].append(call)
+
+    def _publish_rates(self, function_collectors):
+        # TODO this needs a serious rework
+        for c in function_collectors:
+            for sleep in c.sleep:
+                rate = self.spin_rate.get(sleep.method_of, 0)
+                sleep_scope = sleep.scope
+                while isinstance(sleep_scope, CppBlock):
+                    sleep_scope = sleep_scope.scope
+                for var, publish in self.publish.iteritems():
+                    topic = self.publishers[var]
+                    for p in publish:
+                        pub_scope = p.scope
+                        while isinstance(pub_scope, CppBlock):
+                            pub_scope = pub_scope.scope
+                        if p.function == c.function or sleep_scope == pub_scope \
+                                or p.function in c.function_set:
+                            self.publish_rate[topic] = rate
 
 
 class FunctionCollector(object):
@@ -249,6 +278,8 @@ class FunctionCollector(object):
         self.advertise_service  = []
         self.service_client     = []
         self.spin_rate          = []
+        self.sleep              = []
+        self.function_set       = set()
         for statement in function.body.body:
             self._collect(statement)
 
@@ -258,6 +289,7 @@ class FunctionCollector(object):
         elif isinstance(statement, CppFunctionCall):
             self._from_call(statement, nesting)
         elif isinstance(statement, CppControlFlow):
+            # TODO reduce nesting on "else if"
             for branch in statement.branches:
                 for stmt in branch[1].body:
                     self._collect(stmt, nesting = nesting + 1)
@@ -287,6 +319,7 @@ class FunctionCollector(object):
                 self._from_call(call.arguments[1], nesting,
                                 variable = call.arguments[0].name)
             return
+        self.function_set.add(name)
         if name == "advertise" and call.result == "ros::Publisher":
             call.simplify()
             o = AdvertiseTuple(call.arguments[0], call.arguments[1],
@@ -306,7 +339,7 @@ class FunctionCollector(object):
                 and call.method_of.result == "ros::Publisher":
             call.simplify()
             o = PublishTuple(call.method_of.name, nesting,
-                             self.function, call.line)
+                             self.function, call.line, call.scope)
             self.publish.append(o)
         elif name == "advertiseService" and call.result == "ros::ServiceServer":
             call.simplify()
@@ -321,11 +354,15 @@ class FunctionCollector(object):
             o = ServiceClientTuple(call.arguments[0], call.template, nesting,
                                    variable, self.function, call.line)
             self.service_client.append(o)
+        elif name == "sleep" and call.method_of \
+                and call.method_of.result == "ros::Rate":
+            call.simplify()
+            self.sleep.append(call)
 
     def has_results(self):
         return self.subscribe or self.advertise or self.publish \
                 or self.advertise_service or self.service_client \
-                or self.spin_rate
+                or self.spin_rate or self.sleep
 
     def show_results(self):
         for r in self.subscribe:
@@ -665,14 +702,14 @@ class CppControlFlow(CppBasicEntity):
     def _parse_if(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[0], scope = self.scope, lazy = True)
-        body = CppBlock.from_cursor(children[1], scope = self.scope)
+        condition = _parse(children[0], scope = self, lazy = True)
+        body = CppBlock.from_cursor(children[1], scope = self)
         branches = [(condition, body)]
         if len(children) >= 3:
             # this is the "else" branch
-            # condition = CppOperator(self.scope, "!", "bool", (condition,))
+            # condition = CppOperator(self, "!", "bool", (condition,))
             condition = True
-            body = CppBlock.from_cursor(children[2], scope = self.scope)
+            body = CppBlock.from_cursor(children[2], scope = self)
             branches.append((condition, body))
         return branches
 
@@ -680,7 +717,7 @@ class CppControlFlow(CppBasicEntity):
         # switch is hard to parse, this is neither correct nor pretty
         children = list(cursor.get_children())
         assert len(children) >= 2
-        var = _parse(children[0], scope = self.scope, lazy = True)
+        var = _parse(children[0], scope = self, lazy = True)
         assert children[1].kind == clang.CursorKind.COMPOUND_STMT
         branches = []
         condition = True
@@ -691,8 +728,8 @@ class CppControlFlow(CppBasicEntity):
                     branches.append((condition, body))
                 statements = list(node.get_children())
                 body = CppBlock(self)
-                value = _parse(statements[0], scope = self.scope, lazy = True)
-                condition = CppOperator(self.scope, "==", "bool", (var, value))
+                value = _parse(statements[0], scope = self, lazy = True)
+                condition = CppOperator(self, "==", "bool", (var, value))
                 for statement in statements[1:]:
                     body.append_statement(_parse(statement, scope = body))
             elif node.kind == clang.CursorKind.DEFAULT_STMT:
@@ -721,7 +758,7 @@ class CppControlFlow(CppBasicEntity):
             condition = True
         elif len(children) == 2:
             # condition + body
-            condition = _parse(children[0], scope = self.scope, lazy = True)
+            condition = _parse(children[0], scope = self, lazy = True)
         elif len(children) >= 4:
             # var + condition + increment + body
             condition = _parse(children[1], scope = self, lazy = True)
@@ -733,22 +770,22 @@ class CppControlFlow(CppBasicEntity):
             self.variables.append(_parse(children[0], scope = self))
         else:
             # condition + increment + body
-            condition = _parse(children[0], scope = self.scope, lazy = True)
+            condition = _parse(children[0], scope = self, lazy = True)
             body.append_statement(_parse(children[1], scope = body))
         return [(condition, body)]
 
     def _parse_while(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[0], scope = self.scope, lazy = True)
-        body = CppBlock.from_cursor(children[1], scope = self.scope)
+        condition = _parse(children[0], scope = self, lazy = True)
+        body = CppBlock.from_cursor(children[1], scope = self)
         return [(condition, body)]
 
     def _parse_do(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[1], scope = self.scope, lazy = True)
-        body = CppBlock.from_cursor(children[0], scope = self.scope)
+        condition = _parse(children[1], scope = self, lazy = True)
+        body = CppBlock.from_cursor(children[0], scope = self)
         return [(condition, body)]
 
     def get_variables(self):
