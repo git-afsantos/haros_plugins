@@ -8,12 +8,19 @@
 # might be interesting
 # https://github.com/pybee-attic/sealang
 
+###
+# standard packages
 import os
-
-import clang.cindex as clang
-
 from ctypes import ArgumentError
 from collections import namedtuple
+
+###
+# third-party packages
+import clang.cindex as clang
+
+###
+# internal packages
+from cmake_analyser.analyser import CMakeAnalyser
 
 
 ###############################################################################
@@ -52,78 +59,41 @@ def file_analysis(iface, scope):
 ###############################################################################
 
 _DEFAULT_INCLUDES = ["/usr/lib/llvm-3.8/lib/clang/3.8.0/include",
-                     "/usr/include/eigen3", "/usr/include/ImageMagick"]
+                     "/usr/include/eigen3"]
 
-def _find_includes(iface, package, includes):
+_DEFAULT_VARS = {
+    "catkin_INCLUDE_DIRS": "/home/andre/catkin_ws/devel/include",
+    "Boost_INCLUDE_DIRS": "/usr/include/",
+    "Eigen_INCLUDE_DIRS": "/usr/include/eigen3",
+    "ImageMagick_INCLUDE_DIRS": "/usr/include/ImageMagick"
+}
+
+def _find_includes(iface, package, includes, var_data = None):
     if package.id in includes:
         return
-    includes[package.id] = _read_package_includes(package)
+    if var_data is None:
+        var_data = dict(_DEFAULT_VARS)
+    includes[package.id] = _read_package_includes(iface, package, var_data)
     for id in package.dependencies:
         dep = iface.find_package(id)
         if dep:
-            _find_includes(iface, dep, includes)
+            _find_includes(iface, dep, includes, var_data = var_data)
             includes[package.id].extend(includes[dep.id])
     includes[package.id] = list(set(includes[package.id]))
 
 
-def _read_package_includes(package):
+def _read_package_includes(iface, package, var_data):
+    var_data["PROJECT_SOURCE_DIR"] = package.path
     cmake_path = os.path.join(package.path, "CMakeLists.txt")
-    dirs = _read_cmake(cmake_path)
-    return map(lambda t: _replace_cmake_tokens(t, package.path), dirs)
-
-def _read_cmake(cmake_path):
-    all_dirs = list(_DEFAULT_INCLUDES)
-    if os.path.isfile(cmake_path):
-        with open(cmake_path, "r") as f:
-            idirs = None    # include_directories
-            cdirs = None    # catkin_package
-            for line in f:
-                line = line.strip()
-                if idirs is None and line.startswith("include_directories("):
-                    idirs = []
-                    line = line[20:]
-                if not idirs is None:
-                    tokens = line.split(")")
-                    idirs.extend(tokens[0].split())
-                    if len(tokens) > 1:
-                        all_dirs.extend(idirs)
-                        idirs = None
-                        continue
-                if cdirs is None and line.startswith("catkin_package("):
-                    cdirs = []
-                    line = line[15:]
-                if not cdirs is None:
-                    tokens = line.split(")")
-                    cdirs.extend(tokens[0].split())
-                    if len(tokens) > 1:
-                        flag = False
-                        stop_at = ("LIBRARIES", "CATKIN_DEPENDS", "DEPENDS", "CFG_EXTRAS")
-                        for d in cdirs:
-                            if d in stop_at:
-                                flag = False
-                            elif flag:
-                                all_dirs.append(d)
-                            elif d == "INCLUDE_DIRS":
-                                flag = True
-                        cdirs = None
-                        continue
-    return all_dirs
-
-_REPLACEMENTS = {
-    "catkin":   "/home/andre/catkin_ws/devel/include",
-}
-
-def _replace_cmake_tokens(token, pkg_path = ""):
-    token = token.replace("${PROJECT_SOURCE_DIR}/", "")
-    if token[0] == "$" :
-        if token.endswith("_INCLUDE_DIRS}"):
-            component = token[2:-14]
-            if component in _REPLACEMENTS:
-                return _REPLACEMENTS[component]
-            else:
-                return _REPLACEMENTS["catkin"]
-        return _REPLACEMENTS["catkin"]
-    return os.path.join(pkg_path, token)
+    parser = CMakeAnalyser(var_data, dict(os.environ), iface)
+    parser.analyse(cmake_path)
+    includes = list(_DEFAULT_INCLUDES)
+    package_includes = parser.data["package_includes"]
+    if package_includes:
+        includes.extend(package_includes)
+        var_data[package.id + "_INCLUDE_DIRS"] = ";".join(package_includes)
+    includes.extend(parser.data["include_dirs"])
+    return includes
 
 
 
