@@ -92,6 +92,16 @@ class CppExpression(CppBasicEntity):
         return "[{}] {}".format(self.result, self.name)
 
 
+class CppDefaultArgument(CppExpression):
+    def __init__(self, scope, result = "[type]", cursor = None):
+        CppExpression.__init__(self, scope, "(default)", result, cursor)
+
+    def _read_cursor(self, cursor):
+        CppBasicEntity._read_cursor(self, cursor)
+        self.name   = "(default)"
+        self.result = cursor.type.spelling or "[type]"
+
+
 class CppReference(CppExpression):
     def __init__(self, scope, name = "", result = "[type]", cursor = None):
         self.field_of = None
@@ -865,7 +875,7 @@ def _parse(cursor, **options):
         if cursor.kind == clang.CursorKind.UNEXPOSED_EXPR:
             child = next(cursor.get_children(), None)
             if not child:
-                return "[{}] (default)".format(cursor.type.spelling)
+                return CppDefaultArgument.from_cursor(cursor, scope = scope)
         for c in cursor.get_children():
             result = _parse(c, **options)
             if not result is None:
