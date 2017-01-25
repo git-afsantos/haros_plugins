@@ -5,8 +5,9 @@ from collections import namedtuple
 
 ###
 # internal packages
-from cpp_model import CppBlock, CppControlFlow, CppFunction, CppFunctionCall \
-                      CppGlobalScope, CppOperator, CppVariable
+from clang_plugin.cpp_model import CppBlock, CppControlFlow, CppFunction, \
+                                   CppFunctionCall, CppGlobalScope, \
+                                   CppOperator, CppVariable
 
 ###############################################################################
 # Collectibles
