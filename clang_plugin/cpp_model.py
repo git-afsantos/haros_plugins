@@ -97,7 +97,8 @@ class CppDefaultArgument(CppExpression):
         CppExpression.__init__(self, scope, "(default)", result, cursor)
 
     def _read_cursor(self, cursor):
-        CppBasicEntity._read_cursor(self, cursor)
+        # I think extracting file name causes problems...
+        # CppBasicEntity._read_cursor(self, cursor)
         self.name   = "(default)"
         self.result = cursor.type.spelling or "[type]"
 
