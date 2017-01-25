@@ -59,7 +59,7 @@ def file_analysis(iface, scope):
 ###############################################################################
 
 _DEFAULT_INCLUDES = ["/usr/lib/llvm-3.8/lib/clang/3.8.0/include",
-                     "/usr/include/eigen3"]
+                     "/usr/include/eigen3", "/usr/include/pcl-1.7/pcl"]
 
 _DEFAULT_VARS = {
     "catkin_INCLUDE_DIRS": "/home/andre/catkin_ws/devel/include",
