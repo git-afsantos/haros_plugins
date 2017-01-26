@@ -262,6 +262,7 @@ class CppFunctionCall(CppExpression):
                 break
         if children:
             self.method_of = _parse(children[0], scope = self.scope)
+            # TODO multiple templates
             template = []
             for cursor in children[1:]:
                 if cursor.kind == clang.CursorKind.NAMESPACE_REF \

@@ -6,31 +6,58 @@ from collections import namedtuple
 ###
 # internal packages
 from clang_plugin.cpp_model import CppBlock, CppControlFlow, CppFunction, \
-                                   CppFunctionCall, CppGlobalScope, \
-                                   CppOperator, CppVariable
+                                   CppFunctionCall, CppDefaultArgument, \
+                                   CppGlobalScope, CppOperator, CppVariable
 
 ###############################################################################
 # Collectibles
 ###############################################################################
 
+_SUB_TYPE_1 = "subscribe(string topic, uint32_t queue_size, " \
+              "void method(M), T *obj, TransportHints)"
+_SUB_TYPE_2 = "subscribe(string topic, uint32_t queue_size, " \
+              "void function(M), TransportHints)"
+_SUB_TYPE_3 = "subscribe(string topic, uint32_t queue_size, " \
+              "void boost::function(M), VoidConstPtr, TransportHints)"
+_SUB_TYPE_4 = "subscribe(SubscribeOptions)"
+
 SubscribeTuple = namedtuple("SubscribeTuple",
                             ["topic", "queue_size", "callback",
-                             "nesting", "variable", "function", "line"])
+                             "nesting", "variable", "function", "line",
+                             "overload", "transport_hints"])
+
+_ADV_TYPE_1 = "advertise(string topic, uint32_t queue_size, bool latch)"
+_ADV_TYPE_2 = "advertise(string topic, uint32_t queue_size, " \
+              "SubscriberStatusCallback, SubscriberStatusCallback, " \
+              "VoidConstPtr, bool latch)"
+_ADV_TYPE_3 = "advertise(AdvertiseOptions)"
 
 AdvertiseTuple = namedtuple("AdvertiseTuple",
                             ["topic", "queue_size", "message_type",
-                             "nesting", "variable", "function", "line"])
+                             "nesting", "variable", "function", "line",
+                             "overload", "latch"])
 
 PublishTuple = namedtuple("PublishTuple",
                           ["variable", "nesting", "function", "line", "scope"])
 
+_ADV_SRV_TYPE_1 = "advertiseService(string service, " \
+                  "bool method(MReq, MRes), T *obj)"
+_ADV_SRV_TYPE_2 = "advertiseService(string service, bool function(MReq, MRes))"
+_ADV_SRV_TYPE_3 = "advertiseService(string service, " \
+                  "bool boost::function(MReq, MRes), VoidConstPtr)"
+_ADV_SRV_TYPE_4 = "advertiseService(AdvertiseServiceOptions)"
+
 AdvertiseServiceTuple = namedtuple("AdvertiseServiceTuple",
                                    ["topic", "callback", "nesting",
-                                    "variable", "function", "line"])
+                                    "variable", "function", "line",
+                                    "overload", "service_event"])
+
+_SRV_CLI_TYPE_1 = "serviceClient(string service, bool persistent, M_string)"
+_SRV_CLI_TYPE_2 = "serviceClient(ServiceClientOptions)"
 
 ServiceClientTuple = namedtuple("ServiceClientTuple",
                                 ["topic", "message_type", "nesting",
-                                 "variable", "function", "line"])
+                                 "variable", "function", "line", "overload"])
 
 SpinRateTuple = namedtuple("SpinRateTuple",
                            ["rate", "variable", "function", "line"])
@@ -44,13 +71,17 @@ SpinRateTuple = namedtuple("SpinRateTuple",
 class FileCollector(object):
     def __init__(self, function_collectors):
         self.subscribe          = {}
+        self.subscribe_unknown  = []    # for unknown topic
         self.subscribers        = {}
         self.advertise          = {}
+        self.advertise_unknown  = []    # for unknown topic
         self.publish            = {}
         self.publishers         = {}
         self.advertise_service  = {}
+        self.advertise_service_unknown  = []    # for unknown service
         self.servers            = {}
         self.service_client     = {}
+        self.service_client_unknown     = []    # for unknown service
         self.clients            = {}
         self.spin_rate          = {}
         self.publish_rate       = {}
@@ -62,6 +93,18 @@ class FileCollector(object):
         data = [FunctionCollector(f) for f in collect_functions(global_scope)]
         return FileCollector(data)
 
+    def num_subscribe(self):
+        return len(self.subscribe) + len(self.subscribe_unknown)
+
+    def num_advertise(self):
+        return len(self.advertise) + len(self.advertise_unknown)
+
+    def num_advertise_service(self):
+        return len(self.advertise_service) + len(self.advertise_service_unknown)
+
+    def num_service_client(self):
+        return len(self.service_client) + len(self.service_client_unknown)
+
     def _collect(self, function_collectors):
         self._basic_occurrences(function_collectors)
         self._publish_occurrences(function_collectors)
@@ -72,19 +115,31 @@ class FileCollector(object):
             for var in c.spin_rate:
                 self.spin_rate[var.variable] = var
             for var in c.subscribe:
-                self.subscribe[var.topic] = var
+                if isinstance(var.topic, basestring):
+                    self.subscribe[var.topic] = var
+                else:
+                    self.subscribe_unknown.append(var)
                 if var.variable:
                     self.subscribers[var.variable] = var.topic
             for var in c.advertise:
-                self.advertise[var.topic] = var
+                if isinstance(var.topic, basestring):
+                    self.advertise[var.topic] = var
+                else:
+                    self.advertise_unknown.append(var)
                 if var.variable:
                     self.publishers[var.variable] = var.topic
             for var in c.advertise_service:
-                self.advertise_service[var.topic] = var
+                if isinstance(var.topic, basestring):
+                    self.advertise_service[var.topic] = var
+                else:
+                    self.advertise_service_unknown.append(var)
                 if var.variable:
                     self.servers[var.variable] = var.topic
             for var in c.service_client:
-                self.service_client[var.topic] = var
+                if isinstance(var.topic, basestring):
+                    self.service_client[var.topic] = var
+                else:
+                    self.service_client_unknown.append(var)
                 if var.variable:
                     self.clients[var.variable] = var.topic
 
@@ -176,20 +231,9 @@ class FunctionCollector(object):
             return
         self.function_set.add(name)
         if name == "advertise" and call.result == "ros::Publisher":
-            call.simplify()
-            o = AdvertiseTuple(call.arguments[0], call.arguments[1],
-                               call.template, nesting, variable,
-                               self.function, call.line)
-            self.advertise.append(o)
+            self._advertise_call(call, nesting, variable = variable)
         elif name == "subscribe" and call.result == "ros::Subscriber":
-            call.simplify()
-            callback = call.arguments[2]
-            if isinstance(callback, CppOperator) and callback.is_unary:
-                callback = callback.arguments[0]
-            o = SubscribeTuple(call.arguments[0], call.arguments[1],
-                               callback.name, nesting, variable,
-                               self.function, call.line)
-            self.subscribe.append(o)
+            self._subscribe_call(call, nesting, variable = variable)
         elif name == "publish" and call.method_of \
                 and call.method_of.result == "ros::Publisher":
             call.simplify()
@@ -197,22 +241,108 @@ class FunctionCollector(object):
                              self.function, call.line, call.scope)
             self.publish.append(o)
         elif name == "advertiseService" and call.result == "ros::ServiceServer":
-            call.simplify()
-            callback = call.arguments[1]
-            if isinstance(callback, CppOperator) and callback.is_unary:
-                callback = callback.arguments[0]
-            o = AdvertiseServiceTuple(call.arguments[0], callback.name, nesting,
-                                      variable, self.function, call.line)
-            self.advertise_service.append(o)
+            self._advertise_service_call(call, nesting, variable = variable)
         elif name == "serviceClient" and call.result == "ros::ServiceClient":
-            call.simplify()
-            o = ServiceClientTuple(call.arguments[0], call.template, nesting,
-                                   variable, self.function, call.line)
-            self.service_client.append(o)
+            self._service_client_call(call, nesting, variable = variable)
         elif name == "sleep" and call.method_of \
                 and call.method_of.result == "ros::Rate":
             call.simplify()
             self.sleep.append(call)
+
+
+    def _advertise_call(self, call, nesting, variable = None):
+        nargs = len(call.arguments)
+        call.simplify()
+        topic       = None
+        queue_size  = None
+        latch       = False
+        if nargs == 1:
+            atype = _ADV_TYPE_3
+        else:
+            assert nargs == 3 or nargs == 6
+            atype = _ADV_TYPE_1 if nargs == 3 else _ADV_TYPE_2
+            topic       = call.arguments[0]
+            queue_size  = call.arguments[1]
+            latch       = call.arguments[-1]
+            latch       = latch if isinstance(latch, bool) else None
+        self.advertise.append(AdvertiseTuple(topic, queue_size,
+                call.template, nesting, variable, self.function, call.line,
+                atype, latch))
+
+    def _subscribe_call(self, call, nesting, variable = None):
+        nargs = len(call.arguments)
+        call.simplify()
+        topic       = None
+        queue_size  = None
+        callback    = None
+        hints       = False
+        if nargs == 1:
+            # assert call.arguments[0].result == "ros::SubscribeOptions"
+            stype = _SUB_TYPE_4
+        else:
+            # nargs == 4 (function) or nargs == 5 (method/boost)
+            assert nargs == 4 or nargs == 5
+            topic       = call.arguments[0]
+            queue_size  = call.arguments[1]
+            cb          = call.arguments[2]
+            if isinstance(cb, CppOperator) and cb.is_unary:
+                cb = cb.arguments[0]
+            callback = cb.name
+            if nargs == 4:
+                stype = _SUB_TYPE_2
+            else:
+                if isinstance(call.arguments[3], CppDefaultArgument) \
+                        or cb.result.startswith("boost::function"):
+                    stype = _SUB_TYPE_3
+                else:
+                    stype = _SUB_TYPE_1
+            hints = not isinstance(call.arguments[-1], CppDefaultArgument)
+        self.subscribe.append(SubscribeTuple(topic, queue_size, callback,
+                nesting, variable, self.function, call.line, stype, hints))
+
+    def _advertise_service_call(self, call, nesting, variable = None):
+        nargs = len(call.arguments)
+        call.simplify()
+        service     = None
+        callback    = None
+        events      = False
+        if nargs == 1:
+            atype = _ADV_SRV_TYPE_4
+        else:
+            # nargs == 2 (function) or nargs == 3 (method/boost)
+            assert nargs == 2 or nargs == 3
+            service = call.arguments[0]
+            cb = call.arguments[1]
+            if isinstance(cb, CppOperator) and cb.is_unary:
+                cb = cb.arguments[0]
+            callback = cb.name
+            events = "ros::ServiceEvent" in cb.result
+            if nargs == 2:
+                atype = _ADV_SRV_TYPE_2
+            else:
+                if isinstance(call.arguments[2], CppDefaultArgument) \
+                        or cb.result.startswith("boost::function"):
+                    atype = _ADV_SRV_TYPE_3
+                else:
+                    atype = _ADV_SRV_TYPE_1
+        self.advertise_service.append(AdvertiseServiceTuple(service,
+                callback, nesting, variable, self.function, call.line,
+                atype, events))
+
+    def _service_client_call(self, call, nesting, variable = None):
+        nargs = len(call.arguments)
+        call.simplify()
+        service = None
+        ctype = _SRV_CLI_TYPE_1
+        if nargs == 1:
+            if "ros::ServiceClientOptions" in call.arguments[0].result:
+                ctype = _SRV_CLI_TYPE_2
+        else:
+            service = call.arguments[0]
+        self.service_client.append(ServiceClientTuple(service,
+                call.template, nesting, variable, self.function,
+                call.line, ctype))
+
 
     def has_results(self):
         return self.subscribe or self.advertise or self.publish \

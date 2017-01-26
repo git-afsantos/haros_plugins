@@ -113,37 +113,128 @@ def _ast_analysis(unit, file_path):
 
 
 def _report_results(iface, data):
-    iface.report_metric("subscribers", len(data.subscribe))
-    iface.report_metric("publishers", len(data.advertise))
-    iface.report_metric("active_publishers", len(data.publish))
-    iface.report_metric("service_servers", len(data.advertise_service))
-    iface.report_metric("service_clients", len(data.service_client))
+    _report_subscribe_data(iface, data)
+    _report_advertise_data(iface, data)
+    _report_publish_data(iface, data)
+    _report_advertise_service_data(iface, data)
+    _report_service_client_data(iface, data)
+    _report_other_data(iface, data)
+
+
+def _report_subscribe_data(iface, data):
+    hardcoded_topics = 0
+    hardcoded_queue_sizes = 0
+    infinite_queues = 0
+    transport_hints = 0
+    global_resource_names = 0
+    iface.report_metric("subscribers", data.num_subscribe())
     for topic, datum in data.subscribe.iteritems():
+        hardcoded_topics += 1
         iface.report_metric("subscribe_nesting", datum.nesting,
                             line = datum.line, function = datum.function)
         if isinstance(datum.queue_size, (int, long)):
+            hardcoded_queue_sizes += 1
             iface.report_metric("queue_size", datum.queue_size,
                                 line = datum.line, function = datum.function)
+            if datum.queue_size == 0:
+                infinite_queues += 1
+        if datum.transport_hints:
+            transport_hints += 1
+        if topic.startswith("/"):
+            global_resource_names += 1
+    for datum in data.subscribe_unknown:
+        iface.report_metric("subscribe_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
+        if isinstance(datum.queue_size, (int, long)):
+            hardcoded_queue_sizes += 1
+            iface.report_metric("queue_size", datum.queue_size,
+                                line = datum.line, function = datum.function)
+            if datum.queue_size == 0:
+                infinite_queues += 1
+        if datum.transport_hints:
+            transport_hints += 1
+    iface.report_metric("hardcoded_topics", hardcoded_topics)
+    iface.report_metric("hardcoded_queue_sizes", hardcoded_queue_sizes)
+    iface.report_metric("infinite_queues", infinite_queues)
+    iface.report_metric("transport_hints", transport_hints)
+    iface.report_metric("global_resource_names", global_resource_names)
+
+def _report_advertise_data(iface, data):
+    hardcoded_topics = 0
+    infinite_queues = 0
+    latching = 0
+    global_resource_names = 0
+    iface.report_metric("publishers", data.num_advertise())
     for topic, datum in data.advertise.iteritems():
+        hardcoded_topics += 1
         iface.report_metric("advertise_nesting", datum.nesting,
                             line = datum.line, function = datum.function)
         if isinstance(datum.queue_size, (int, long)):
+            hardcoded_queue_sizes += 1
             iface.report_metric("queue_size", datum.queue_size,
                                 line = datum.line, function = datum.function)
+            if datum.queue_size == 0:
+                infinite_queues += 1
+        if datum.latch:
+            latching += 1
+        if topic.startswith("/"):
+            global_resource_names += 1
+    for datum in data.advertise_unknown:
+        iface.report_metric("advertise_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
+        if isinstance(datum.queue_size, (int, long)):
+            hardcoded_queue_sizes += 1
+            iface.report_metric("queue_size", datum.queue_size,
+                                line = datum.line, function = datum.function)
+            if datum.queue_size == 0:
+                infinite_queues += 1
+        if datum.latch:
+            latching += 1
+    iface.report_metric("hardcoded_topics", hardcoded_topics)
+    iface.report_metric("hardcoded_queue_sizes", hardcoded_queue_sizes)
+    iface.report_metric("infinite_queues", infinite_queues)
+    iface.report_metric("latching_topics", latching)
+    iface.report_metric("global_resource_names", global_resource_names)
+
+def _report_publish_data(iface, data):
+    iface.report_metric("active_publishers", len(data.publish))
     for var, d in data.publish.iteritems():
         for datum in d:
             iface.report_metric("publish_nesting", datum.nesting,
                                 line = datum.line, function = datum.function)
+
+def _report_advertise_service_data(iface, data):
+    hardcoded_services = 0
+    iface.report_metric("service_servers", data.num_advertise_service())
     for topic, datum in data.advertise_service.iteritems():
+        hardcoded_services += 1
         iface.report_metric("advertise_service_nesting", datum.nesting,
                             line = datum.line, function = datum.function)
+    for datum in data.advertise_service_unknown:
+        iface.report_metric("advertise_service_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
+    iface.report_metric("hardcoded_services", hardcoded_services)
+
+def _report_service_client_data(iface, data):
+    hardcoded_services = 0
+    iface.report_metric("service_clients", data.num_service_client())
     for topic, datum in data.service_client.iteritems():
+        hardcoded_services += 1
         iface.report_metric("service_client_nesting", datum.nesting,
                             line = datum.line, function = datum.function)
+    for datum in data.service_client_unknown:
+        iface.report_metric("service_client_nesting", datum.nesting,
+                            line = datum.line, function = datum.function)
+    iface.report_metric("hardcoded_services", hardcoded_services)
+
+def _report_other_data(iface, data):
+    hardcoded_spin_rates = 0
     for var, datum in data.spin_rate.iteritems():
         if isinstance(datum.rate, (int, long)):
+            hardcoded_spin_rates += 1
             iface.report_metric("spin_rate", datum.rate,
                                 function = datum.function)
+    iface.report_metric("hardcoded_spin_rates", hardcoded_spin_rates)
 
 
 

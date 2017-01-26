@@ -65,6 +65,46 @@ metrics:
         description: Size given to a topic queue.
         scope: file
         min: 0
+    hardcoded_topics:
+        name: Number of Hard-coded Topic Names
+        description: Number of topics explicitly declared as a string literal.
+        scope: file
+        min: 0
+    hardcoded_services:
+        name: Number of Hard-coded Service Names
+        description: Number of services explicitly declared as a string literal.
+        scope: file
+        min: 0
+    hardcoded_queue_sizes:
+        name: Number of Hard-coded Queue Sizes
+        description: Number of queue sizes explicitly declared as an integer literal.
+        scope: file
+        min: 0
+    hardcoded_spin_rates:
+        name: Number of Hard-coded Spin Rates
+        description: Number of spin rates explicitly declared as an integer literal.
+        scope: file
+        min: 0
+    latching_topics:
+        name: Number of Latching Topics
+        description: Number of topics advertised with latch as true.
+        scope: file
+        min: 0
+    infinite_queues:
+        name: Number of Zero-sized Queues
+        description: Number of topic queues with size zero.
+        scope: file
+        min: 0
+    transport_hints:
+        name: Number of Uses of Transport Hints
+        description: Number of uses of Transport Hints.
+        scope: file
+        min: 0
+    global_resource_names:
+        name: Number of Global Names Used
+        description: Number of uses of global names (topics, services).
+        scope: file
+        min: 0
 supported_metrics:
     - spin_rate
     - subscribers
@@ -78,3 +118,11 @@ supported_metrics:
     - service_clients
     - service_client_nesting
     - queue_size
+    - hardcoded_topics
+    - hardcoded_services
+    - hardcoded_queue_sizes
+    - hardcoded_spin_rates
+    - latching_topics
+    - infinite_queues
+    - transport_hints
+    - global_resource_names
