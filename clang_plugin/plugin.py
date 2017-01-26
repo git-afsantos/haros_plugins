@@ -161,6 +161,7 @@ def _report_subscribe_data(iface, data):
 
 def _report_advertise_data(iface, data):
     hardcoded_topics = 0
+    hardcoded_queue_sizes = 0
     infinite_queues = 0
     latching = 0
     global_resource_names = 0
