@@ -196,7 +196,7 @@ rules:
     harosIntegerTypes:
         name:           Integer Types
         scope:          file
-        description:    Do not use integer types directly. Use size-specific typedefs, for instance from <cstdint>.
+        description:    Do not use integer types directly. Use size-specific typedefs, for instance from &lt;cstdint&gt;.
         tags:
             - code-standards
             - integer-types
