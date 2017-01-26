@@ -20,7 +20,7 @@ import clang.cindex as clang
 # internal packages
 from cmake_analyser.analyser import CMakeAnalyser
 from clang_plugin.cpp_model import CppGlobalScope
-from clang_plugin.collectors import FileCollector
+import clang_plugin.collectors as collectors
 
 
 ###############################################################################
@@ -109,7 +109,7 @@ def _ast_analysis(unit, file_path):
     for node in cursor.get_children():
         if node.location.file and node.location.file.name == file_path:
             global_scope.add_from_cursor(node)
-    return FileCollector.from_global_scope(global_scope)
+    return collectors.FileCollector.from_global_scope(global_scope)
 
 
 def _report_results(iface, data):
@@ -127,6 +127,9 @@ def _report_subscribe_data(iface, data):
     infinite_queues = 0
     transport_hints = 0
     global_resource_names = 0
+    function_callbacks = 0
+    method_callbacks = 0
+    boost_callbacks = 0
     iface.report_metric("subscribers", data.num_subscribe())
     for topic, datum in data.subscribe.iteritems():
         hardcoded_topics += 1
@@ -142,6 +145,12 @@ def _report_subscribe_data(iface, data):
             transport_hints += 1
         if topic.startswith("/"):
             global_resource_names += 1
+        if datum.overload == collectors.SUB_TYPE_1:
+            method_callbacks += 1
+        if datum.overload == collectors.SUB_TYPE_2:
+            function_callbacks += 1
+        if datum.overload == collectors.SUB_TYPE_3:
+            boost_callbacks += 1
     for datum in data.subscribe_unknown:
         iface.report_metric("subscribe_nesting", datum.nesting,
                             line = datum.line, function = datum.function)
@@ -153,11 +162,20 @@ def _report_subscribe_data(iface, data):
                 infinite_queues += 1
         if datum.transport_hints:
             transport_hints += 1
+        if datum.overload == collectors.SUB_TYPE_1:
+            method_callbacks += 1
+        if datum.overload == collectors.SUB_TYPE_2:
+            function_callbacks += 1
+        if datum.overload == collectors.SUB_TYPE_3:
+            boost_callbacks += 1
     iface.report_metric("hardcoded_topics", hardcoded_topics)
     iface.report_metric("hardcoded_queue_sizes", hardcoded_queue_sizes)
     iface.report_metric("infinite_queues", infinite_queues)
     iface.report_metric("transport_hints", transport_hints)
     iface.report_metric("global_resource_names", global_resource_names)
+    iface.report_metric("function_callbacks", function_callbacks)
+    iface.report_metric("method_callbacks", method_callbacks)
+    iface.report_metric("boost_callbacks", boost_callbacks)
 
 def _report_advertise_data(iface, data):
     hardcoded_topics = 0
@@ -206,15 +224,33 @@ def _report_publish_data(iface, data):
 
 def _report_advertise_service_data(iface, data):
     hardcoded_services = 0
+    function_callbacks = 0
+    method_callbacks = 0
+    boost_callbacks = 0
     iface.report_metric("service_servers", data.num_advertise_service())
     for topic, datum in data.advertise_service.iteritems():
         hardcoded_services += 1
         iface.report_metric("advertise_service_nesting", datum.nesting,
                             line = datum.line, function = datum.function)
+        if datum.overload == collectors.SUB_TYPE_1:
+            method_callbacks += 1
+        if datum.overload == collectors.SUB_TYPE_2:
+            function_callbacks += 1
+        if datum.overload == collectors.SUB_TYPE_3:
+            boost_callbacks += 1
     for datum in data.advertise_service_unknown:
         iface.report_metric("advertise_service_nesting", datum.nesting,
                             line = datum.line, function = datum.function)
+        if datum.overload == collectors.SUB_TYPE_1:
+            method_callbacks += 1
+        if datum.overload == collectors.SUB_TYPE_2:
+            function_callbacks += 1
+        if datum.overload == collectors.SUB_TYPE_3:
+            boost_callbacks += 1
     iface.report_metric("hardcoded_services", hardcoded_services)
+    iface.report_metric("function_callbacks", function_callbacks)
+    iface.report_metric("method_callbacks", method_callbacks)
+    iface.report_metric("boost_callbacks", boost_callbacks)
 
 def _report_service_client_data(iface, data):
     hardcoded_services = 0
@@ -259,7 +295,7 @@ def analysis(file_path, index):
         if node.location.file and node.location.file.name == file_path:
             global_scope.add_from_cursor(node)
     # print global_scope.pretty_str()
-    data = FileCollector.from_global_scope(global_scope)
+    data = collectors.FileCollector.from_global_scope(global_scope)
     if not data.publish_rate:
         print "No publish rates were detected."
     for topic, rate in data.publish_rate.iteritems():

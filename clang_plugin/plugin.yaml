@@ -105,6 +105,21 @@ metrics:
         description: Number of uses of global names (topics, services).
         scope: file
         min: 0
+    function_callbacks:
+        name: Number of Function Callbacks
+        description: Number of bare functions used as callbacks.
+        scope: file
+        min: 0
+    method_callbacks:
+        name: Number of Method Callbacks
+        description: Number of class member functions used as callbacks.
+        scope: file
+        min: 0
+    boost_callbacks:
+        name: Number of Boost Function Callbacks
+        description: Number of boost functions used as callbacks.
+        scope: file
+        min: 0
 supported_metrics:
     - spin_rate
     - subscribers
@@ -126,3 +141,6 @@ supported_metrics:
     - infinite_queues
     - transport_hints
     - global_resource_names
+    - function_callbacks
+    - method_callbacks
+    - boost_callbacks

@@ -13,24 +13,24 @@ from clang_plugin.cpp_model import CppBlock, CppControlFlow, CppFunction, \
 # Collectibles
 ###############################################################################
 
-_SUB_TYPE_1 = "subscribe(string topic, uint32_t queue_size, " \
-              "void method(M), T *obj, TransportHints)"
-_SUB_TYPE_2 = "subscribe(string topic, uint32_t queue_size, " \
-              "void function(M), TransportHints)"
-_SUB_TYPE_3 = "subscribe(string topic, uint32_t queue_size, " \
-              "void boost::function(M), VoidConstPtr, TransportHints)"
-_SUB_TYPE_4 = "subscribe(SubscribeOptions)"
+SUB_TYPE_1 = "subscribe(string topic, uint32_t queue_size, " \
+             "void method(M), T *obj, TransportHints)"
+SUB_TYPE_2 = "subscribe(string topic, uint32_t queue_size, " \
+             "void function(M), TransportHints)"
+SUB_TYPE_3 = "subscribe(string topic, uint32_t queue_size, " \
+             "void boost::function(M), VoidConstPtr, TransportHints)"
+SUB_TYPE_4 = "subscribe(SubscribeOptions)"
 
 SubscribeTuple = namedtuple("SubscribeTuple",
                             ["topic", "queue_size", "callback",
                              "nesting", "variable", "function", "line",
                              "overload", "transport_hints"])
 
-_ADV_TYPE_1 = "advertise(string topic, uint32_t queue_size, bool latch)"
-_ADV_TYPE_2 = "advertise(string topic, uint32_t queue_size, " \
-              "SubscriberStatusCallback, SubscriberStatusCallback, " \
-              "VoidConstPtr, bool latch)"
-_ADV_TYPE_3 = "advertise(AdvertiseOptions)"
+ADV_TYPE_1 = "advertise(string topic, uint32_t queue_size, bool latch)"
+ADV_TYPE_2 = "advertise(string topic, uint32_t queue_size, " \
+             "SubscriberStatusCallback, SubscriberStatusCallback, " \
+             "VoidConstPtr, bool latch)"
+ADV_TYPE_3 = "advertise(AdvertiseOptions)"
 
 AdvertiseTuple = namedtuple("AdvertiseTuple",
                             ["topic", "queue_size", "message_type",
@@ -40,20 +40,20 @@ AdvertiseTuple = namedtuple("AdvertiseTuple",
 PublishTuple = namedtuple("PublishTuple",
                           ["variable", "nesting", "function", "line", "scope"])
 
-_ADV_SRV_TYPE_1 = "advertiseService(string service, " \
-                  "bool method(MReq, MRes), T *obj)"
-_ADV_SRV_TYPE_2 = "advertiseService(string service, bool function(MReq, MRes))"
-_ADV_SRV_TYPE_3 = "advertiseService(string service, " \
-                  "bool boost::function(MReq, MRes), VoidConstPtr)"
-_ADV_SRV_TYPE_4 = "advertiseService(AdvertiseServiceOptions)"
+ADV_SRV_TYPE_1 = "advertiseService(string service, " \
+                 "bool method(MReq, MRes), T *obj)"
+ADV_SRV_TYPE_2 = "advertiseService(string service, bool function(MReq, MRes))"
+ADV_SRV_TYPE_3 = "advertiseService(string service, " \
+                 "bool boost::function(MReq, MRes), VoidConstPtr)"
+ADV_SRV_TYPE_4 = "advertiseService(AdvertiseServiceOptions)"
 
 AdvertiseServiceTuple = namedtuple("AdvertiseServiceTuple",
                                    ["topic", "callback", "nesting",
                                     "variable", "function", "line",
                                     "overload", "service_event"])
 
-_SRV_CLI_TYPE_1 = "serviceClient(string service, bool persistent, M_string)"
-_SRV_CLI_TYPE_2 = "serviceClient(ServiceClientOptions)"
+SRV_CLI_TYPE_1 = "serviceClient(string service, bool persistent, M_string)"
+SRV_CLI_TYPE_2 = "serviceClient(ServiceClientOptions)"
 
 ServiceClientTuple = namedtuple("ServiceClientTuple",
                                 ["topic", "message_type", "nesting",
@@ -257,10 +257,10 @@ class FunctionCollector(object):
         queue_size  = None
         latch       = False
         if nargs == 1:
-            atype = _ADV_TYPE_3
+            atype = ADV_TYPE_3
         else:
             assert nargs == 3 or nargs == 6
-            atype = _ADV_TYPE_1 if nargs == 3 else _ADV_TYPE_2
+            atype = ADV_TYPE_1 if nargs == 3 else ADV_TYPE_2
             topic       = call.arguments[0]
             queue_size  = call.arguments[1]
             latch       = call.arguments[-1]
@@ -278,7 +278,7 @@ class FunctionCollector(object):
         hints       = False
         if nargs == 1:
             # assert call.arguments[0].result == "ros::SubscribeOptions"
-            stype = _SUB_TYPE_4
+            stype = SUB_TYPE_4
         else:
             # nargs == 4 (function) or nargs == 5 (method/boost)
             assert nargs == 4 or nargs == 5
@@ -289,13 +289,13 @@ class FunctionCollector(object):
                 cb = cb.arguments[0]
             callback = cb.name
             if nargs == 4:
-                stype = _SUB_TYPE_2
+                stype = SUB_TYPE_2
             else:
                 if isinstance(call.arguments[3], CppDefaultArgument) \
                         or cb.result.startswith("boost::function"):
-                    stype = _SUB_TYPE_3
+                    stype = SUB_TYPE_3
                 else:
-                    stype = _SUB_TYPE_1
+                    stype = SUB_TYPE_1
             hints = not isinstance(call.arguments[-1], CppDefaultArgument)
         self.subscribe.append(SubscribeTuple(topic, queue_size, callback,
                 nesting, variable, self.function, call.line, stype, hints))
@@ -307,7 +307,7 @@ class FunctionCollector(object):
         callback    = None
         events      = False
         if nargs == 1:
-            atype = _ADV_SRV_TYPE_4
+            atype = ADV_SRV_TYPE_4
         else:
             # nargs == 2 (function) or nargs == 3 (method/boost)
             assert nargs == 2 or nargs == 3
@@ -318,13 +318,13 @@ class FunctionCollector(object):
             callback = cb.name
             events = "ros::ServiceEvent" in cb.result
             if nargs == 2:
-                atype = _ADV_SRV_TYPE_2
+                atype = ADV_SRV_TYPE_2
             else:
                 if isinstance(call.arguments[2], CppDefaultArgument) \
                         or cb.result.startswith("boost::function"):
-                    atype = _ADV_SRV_TYPE_3
+                    atype = ADV_SRV_TYPE_3
                 else:
-                    atype = _ADV_SRV_TYPE_1
+                    atype = ADV_SRV_TYPE_1
         self.advertise_service.append(AdvertiseServiceTuple(service,
                 callback, nesting, variable, self.function, call.line,
                 atype, events))
@@ -333,10 +333,10 @@ class FunctionCollector(object):
         nargs = len(call.arguments)
         call.simplify()
         service = None
-        ctype = _SRV_CLI_TYPE_1
+        ctype = SRV_CLI_TYPE_1
         if nargs == 1:
             if "ros::ServiceClientOptions" in call.arguments[0].result:
-                ctype = _SRV_CLI_TYPE_2
+                ctype = SRV_CLI_TYPE_2
         else:
             service = call.arguments[0]
         self.service_client.append(ServiceClientTuple(service,
