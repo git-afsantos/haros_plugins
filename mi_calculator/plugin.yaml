@@ -2,5 +2,8 @@
 ---
 name: mi_calculator
 version: 0.1
+supported_rules:
+    - mi_below_20
+    - mi_below_65
 supported_metrics:
     - maintainability_index

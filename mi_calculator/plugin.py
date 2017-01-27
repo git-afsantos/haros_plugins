@@ -99,3 +99,7 @@ def post_process(iface):
         value = mi.compute()
         if not value is None:
             iface.report_file_metric("maintainability_index", value, id)
+            if value < 20:
+                iface.report_violation("mi_below_20", "MI of " + str(value))
+            if value < 65:
+                iface.report_violation("mi_below_65", "MI of " + str(value))
