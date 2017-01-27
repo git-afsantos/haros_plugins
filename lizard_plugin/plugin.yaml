@@ -6,6 +6,10 @@ languages:
     - cpp
     - java
     - python
+supported_rules:
+    - max_function_parameters_6
+    - max_cyclomatic_complexity_10
+    - max_cyclomatic_complexity_15
 supported_metrics:
     - cyclomatic_complexity
     - function_parameters
