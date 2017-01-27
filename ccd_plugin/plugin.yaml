@@ -4,6 +4,9 @@ name: ccd_plugin
 version: 0.1
 languages:
     - cpp
+supported_rules:
+    - halstead_volume_above_8000
+    - halstead_bugs_above_2
 supported_metrics:
     - halstead_bugs
     - halstead_time
