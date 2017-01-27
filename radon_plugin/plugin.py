@@ -16,6 +16,10 @@ def file_analysis(iface, scope):
     h = analyse_halstead_metrics(iface, code)
     mi = mi_compute(h, cc, lloc, ratio)
     iface.report_metric("maintainability_index", mi)
+    if mi < 20:
+        iface.report_violation("mi_below_20", "MI of " + str(mi))
+    if mi < 65:
+        iface.report_violation("mi_below_65", "MI of " + str(mi))
 
 
 def analyse_cc(iface, code):
@@ -25,6 +29,12 @@ def analyse_cc(iface, code):
                             line = f.lineno,
                             function = f.name,
                             class_ = f.classname)
+        if f.complexity > 10:
+            iface.report_violation("max_cyclomatic_complexity_10",
+                                   "CC of " + str(f.complexity))
+        if f.complexity > 15:
+            iface.report_violation("max_cyclomatic_complexity_15",
+                                   "CC of " + str(f.complexity))
     return visitor.total_complexity
 
 def analyse_raw_metrics(iface, code):
@@ -35,9 +45,9 @@ def analyse_raw_metrics(iface, code):
     iface.report_metric("comments", locom)
     ploc = metrics.sloc - locom
     iface.report_metric("ploc", ploc)
-    if ploc > 40:
-        iface.report_violation("max_function_length_40",
-                               "Function length of " + str(ploc))
+    if ploc > 400:
+        iface.report_violation("max_file_length_400",
+                               "File length (PLOC) of " + str(ploc))
     ratio = locom / float(metrics.sloc) if metrics.sloc != 0 else 0
     iface.report_metric("comment_ratio", ratio)
     if ratio < 0.2:
@@ -54,6 +64,12 @@ def analyse_raw_metrics(iface, code):
 def analyse_halstead_metrics(iface, code):
     metrics = h_visit(code)
     iface.report_metric("halstead_volume", metrics.volume)
+    if metrics.volume > 8000:
+        iface.report_violation("halstead_volume_above_8000",
+                               "Halstead Volume of " + str(metrics.volume))
     iface.report_metric("halstead_time", metrics.time)
     iface.report_metric("halstead_bugs", metrics.bugs)
+    if metrics.bugs > 2:
+        iface.report_violation("halstead_bugs_above_2",
+                               "Halstead Bugs of " + str(metrics.bugs))
     return metrics.volume
