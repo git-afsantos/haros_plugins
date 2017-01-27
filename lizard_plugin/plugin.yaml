@@ -10,6 +10,8 @@ supported_rules:
     - max_function_parameters_6
     - max_cyclomatic_complexity_10
     - max_cyclomatic_complexity_15
+    - max_function_length_40
+    - max_file_length_400
 supported_metrics:
     - cyclomatic_complexity
     - function_parameters

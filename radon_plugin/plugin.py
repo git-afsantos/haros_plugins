@@ -33,7 +33,11 @@ def analyse_raw_metrics(iface, code):
     iface.report_metric("sloc", metrics.sloc)
     locom = metrics.comments + metrics.multi
     iface.report_metric("comments", locom)
-    iface.report_metric("ploc", metrics.sloc - locom)
+    ploc = metrics.sloc - locom
+    iface.report_metric("ploc", ploc)
+    if ploc > 40:
+        iface.report_violation("max_function_length_40",
+                               "Function length of " + str(ploc))
     ratio = locom / float(metrics.sloc) if metrics.sloc != 0 else 0
     iface.report_metric("comment_ratio", ratio)
     if ratio < 0.2:

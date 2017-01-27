@@ -6,7 +6,11 @@ languages:
     - python
 rules: {}
 metrics: {}
-supported_rules: []
+supported_rules:
+    - max_function_length_40
+    - min_comment_ratio_20
+    - max_comment_ratio_30
+    - max_comment_ratio_40
 supported_metrics:
     - comment_ratio
     - cyclomatic_complexity
