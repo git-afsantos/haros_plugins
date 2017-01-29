@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-#Copyright (c) 2013 Dominik Borowiec, Andre Santos
+#Copyright (c) 2013 Dominik Borowiec, 2016 Andre Santos
 #
 #Permission is hereby granted, free of charge, to any person obtaining a copy
 #of this software and associated documentation files (the "Software"), to deal
@@ -383,6 +383,14 @@ def file_analysis(iface, scope):
         code = f.read().splitlines()
     (regularLines, comments) = CommentFilter().filterComments(code)
     metrics = Halstead(regularLines)
-    iface.report_metric("halstead_volume", metrics.getVolume())
+    volume = metrics.getVolume()
+    iface.report_metric("halstead_volume", volume)
+    if volume > 8000:
+        iface.report_violation("halstead_volume_above_8000",
+                               "Halstead volume of " + str(volume))
     iface.report_metric("halstead_time", metrics.getEffort() / 18.0)
-    iface.report_metric("halstead_bugs", metrics.getVolume() / 3000.0)
+    bugs = metrics.getVolume() / 3000.0
+    iface.report_metric("halstead_bugs", bugs)
+    if bugs > 2:
+        iface.report_violation("halstead_bugs_above_2",
+                                "Halstead Bugs of " + str(bugs))
