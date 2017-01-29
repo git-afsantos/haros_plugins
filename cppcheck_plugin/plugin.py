@@ -73,10 +73,13 @@ def package_analysis(iface, scope):
         FNULL.close()
         output.close()
     files   = file_mapping(scope)
-    xml     = ET.parse(scope.id + ".xml").getroot()
-    errors  = xml.find("errors")
-    for error in errors:
-        handle_report(iface, files, error)
+    try:
+        xml     = ET.parse(scope.id + ".xml").getroot()
+        errors  = xml.find("errors")
+        for error in errors:
+            handle_report(iface, files, error)
+    except ET.ParseError as e:
+        pass
 
 
 
