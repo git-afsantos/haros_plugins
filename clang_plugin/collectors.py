@@ -22,7 +22,7 @@ SUB_TYPE_3 = "subscribe(string topic, uint32_t queue_size, " \
 SUB_TYPE_4 = "subscribe(SubscribeOptions)"
 
 SubscribeTuple = namedtuple("SubscribeTuple",
-                            ["topic", "queue_size", "callback",
+                            ["topic", "queue_size", "callback", "message_type",
                              "nesting", "variable", "function", "line",
                              "overload", "transport_hints"])
 
@@ -48,8 +48,8 @@ ADV_SRV_TYPE_3 = "advertiseService(string service, " \
 ADV_SRV_TYPE_4 = "advertiseService(AdvertiseServiceOptions)"
 
 AdvertiseServiceTuple = namedtuple("AdvertiseServiceTuple",
-                                   ["topic", "callback", "nesting",
-                                    "variable", "function", "line",
+                                   ["topic", "callback", "message_type",
+                                    "nesting", "variable", "function", "line",
                                     "overload", "service_event"])
 
 SRV_CLI_TYPE_1 = "serviceClient(string service, bool persistent, M_string)"
@@ -61,6 +61,45 @@ ServiceClientTuple = namedtuple("ServiceClientTuple",
 
 SpinRateTuple = namedtuple("SpinRateTuple",
                            ["rate", "variable", "function", "line"])
+
+
+
+###############################################################################
+# Global Collector
+###############################################################################
+
+class GlobalCollector(object):
+    def __init__(self, file_collectors):
+        self.msg_to_queue = {}
+        self._collect(file_collectors)
+
+
+    def _collect(self, file_collectors):
+        for fc in file_collectors:
+            for _, sub in fc.subscribe.iteritems():
+                self._collect_message(sub, True)
+            for _, adv in fc.advertise.iteritems():
+                self._collect_message(adv, False)
+
+    def _collect_message(self, data, is_sub):
+        # data is one of the collectibles
+        m = data.message_type
+        q = data.queue_size
+        if not m in self.msg_to_queue:
+            self.msg_to_queue[m] = ({}, {}) # in/out
+        counter = self.msg_to_queue[m][0 if is_sub else 1]
+        counter[q] = counter.get(q, 0) + 1
+
+
+    def pretty_print(self):
+        print ""
+        for msg, counters in self.msg_to_queue.iteritems():
+            print msg, "in:"
+            for q, n in counters[0].iteritems():
+                print "    {}: {}".format(q, n)
+            print msg, "out:"
+            for q, n in counters[1].iteritems():
+                print "    {}: {}".format(q, n)
 
 
 
@@ -275,6 +314,7 @@ class FunctionCollector(object):
         topic       = None
         queue_size  = None
         callback    = None
+        msg_type    = None
         hints       = False
         if nargs == 1:
             # assert call.arguments[0].result == "ros::SubscribeOptions"
@@ -288,6 +328,7 @@ class FunctionCollector(object):
             if isinstance(cb, CppOperator) and cb.is_unary:
                 cb = cb.arguments[0]
             callback = cb.name
+            msg_type = self._msg_type_from_callback(cb)
             if nargs == 4:
                 stype = SUB_TYPE_2
             else:
@@ -298,13 +339,15 @@ class FunctionCollector(object):
                     stype = SUB_TYPE_1
             hints = not isinstance(call.arguments[-1], CppDefaultArgument)
         self.subscribe.append(SubscribeTuple(topic, queue_size, callback,
-                nesting, variable, self.function, call.line, stype, hints))
+                msg_type, nesting, variable, self.function,
+                call.line, stype, hints))
 
     def _advertise_service_call(self, call, nesting, variable = None):
         nargs = len(call.arguments)
         call.simplify()
         service     = None
         callback    = None
+        msg_type    = None
         events      = False
         if nargs == 1:
             atype = ADV_SRV_TYPE_4
@@ -316,6 +359,7 @@ class FunctionCollector(object):
             if isinstance(cb, CppOperator) and cb.is_unary:
                 cb = cb.arguments[0]
             callback = cb.name
+            msg_type = self._msg_type_from_callback(cb)
             events = "ros::ServiceEvent" in cb.result
             if nargs == 2:
                 atype = ADV_SRV_TYPE_2
@@ -326,7 +370,7 @@ class FunctionCollector(object):
                 else:
                     atype = ADV_SRV_TYPE_1
         self.advertise_service.append(AdvertiseServiceTuple(service,
-                callback, nesting, variable, self.function, call.line,
+                callback, msg_type, nesting, variable, self.function, call.line,
                 atype, events))
 
     def _service_client_call(self, call, nesting, variable = None):
@@ -342,6 +386,27 @@ class FunctionCollector(object):
         self.service_client.append(ServiceClientTuple(service,
                 call.template, nesting, variable, self.function,
                 call.line, ctype))
+
+
+    def _msg_type_from_callback(self, callback):
+        type_string = callback.result
+        type_string = type_string.split(None, 1)[1]
+        assert type_string[0] == "(" and type_string[-1] == ")"
+        type_string = type_string[1:-1]
+        is_const = type_string.startswith("const ")
+        if is_const:
+            type_string = type_string[6:]
+        is_ref = type_string.endswith(" &")
+        if is_ref:
+            type_string = type_string[:-2]
+        is_ptr = type_string.endswith("::ConstPtr")
+        if is_ptr:
+            type_string = type_string[:-10]
+        else:
+            is_ptr = type_string.endswith("ConstPtr")
+            if is_ptr:
+                type_string = type_string[:-8]
+        return type_string
 
 
     def has_results(self):

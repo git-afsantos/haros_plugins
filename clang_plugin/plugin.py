@@ -30,13 +30,15 @@ import clang_plugin.collectors as collectors
 def pre_analysis():
     clang.Config.set_library_path("/usr/lib/llvm-3.8/lib")
     index = clang.Index.create()
-    return (index, {})
+    return (index, {}, [])
+    # index, include map, file collectors
 
 
 def file_analysis(iface, scope):
     file_path   = scope.get_path()
     index       = iface.state[0]
     includes    = iface.state[1]
+    collection  = iface.state[2]
     _find_includes(iface, scope.package, includes)
     assert scope.package.id in includes
     args = ["-I" + path for path in includes[scope.package.id]]
@@ -52,6 +54,12 @@ def file_analysis(iface, scope):
     # traverse nodes
     data = _ast_analysis(unit, file_path)
     _report_results(iface, data)
+    collection.append(data)
+
+
+def post_analysis(iface):
+    gc = collectors.GlobalCollector(iface.state[2])
+    gc.pretty_print()
 
 
 ###############################################################################
@@ -349,7 +357,7 @@ def print_ast(file_path, index):
 
 
 def main():
-    file_path = "/home/andre/ros/tests/talker.cpp"
+    file_path = "/home/andre/catkin_ws/src/beginner_tutorials/src/listener.cpp"
     # file_path = "/home/andre/kobuki/src/kobuki/kobuki_node/src/library/kobuki_ros.cpp"
     clang.Config.set_library_path("/usr/lib/llvm-3.8/lib")
     index = clang.Index.create()
