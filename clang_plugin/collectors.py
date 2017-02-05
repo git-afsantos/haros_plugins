@@ -161,7 +161,7 @@ class PublisherStatistics(object):
                 self.infinite_queues += 1
             self._collect_message(datum)
         if datum.latch:
-            self.latching += 1
+            self.latching_topics += 1
         if datum.overload == ADV_TYPE_2:
             self.subscriber_status += 1
 
