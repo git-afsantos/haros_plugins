@@ -631,7 +631,9 @@ class FunctionCollector(object):
     def _msg_type_from_callback(self, callback):
         type_string = callback.result
         type_string = type_string.split(None, 1)[1]
-        assert type_string[0] == "(" and type_string[-1] == ")"
+        if not (type_string[0] == "(" and type_string[-1] == ")"):
+            print "Unknown message type:", type_string
+            return type_string
         type_string = type_string[1:-1]
         is_const = type_string.startswith("const ")
         if is_const:
