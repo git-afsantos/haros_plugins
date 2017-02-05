@@ -68,38 +68,277 @@ SpinRateTuple = namedtuple("SpinRateTuple",
 # Global Collector
 ###############################################################################
 
-class GlobalCollector(object):
-    def __init__(self, file_collectors):
-        self.msg_to_queue = {}
-        self._collect(file_collectors)
+class SubscriberStatistics(object):
+    def __init__(self):
+        self.hardcoded_topics   = 0
+        self.hardcoded_queues   = []
+        self.infinite_queues    = 0
+        self.msg_to_queue       = {}
+        self.nesting            = []
+        self.global_topics      = 0
+        self.transport_hints    = 0
+        self.function_callbacks = 0
+        self.method_callbacks   = 0
+        self.boost_callbacks    = 0
 
+    @property
+    def total_subscribers(self):
+        return len(self.nesting)
 
-    def _collect(self, file_collectors):
-        for fc in file_collectors:
-            for _, sub in fc.subscribe.iteritems():
-                self._collect_message(sub, True)
-            for _, adv in fc.advertise.iteritems():
-                self._collect_message(adv, False)
+    def collect_subscribe(self, datum):
+        if isinstance(datum.topic, basestring):
+            self.hardcoded_topics += 1
+            if datum.topic.startswith("/"):
+                self.global_topics += 1
+        self.subscribe_nesting.append(datum.nesting)
+        if isinstance(datum.queue_size, (int, long)):
+            self.hardcoded_queues.append(datum.queue_size)
+            if datum.queue_size == 0:
+                self.infinite_queues += 1
+            self._collect_message(datum)
+        if datum.transport_hints:
+            self.transport_hints += 1
+        if datum.overload == SUB_TYPE_1:
+            self.method_callbacks += 1
+        elif datum.overload == SUB_TYPE_2:
+            self.function_callbacks += 1
+        elif datum.overload == SUB_TYPE_3:
+            self.boost_callbacks += 1
 
-    def _collect_message(self, data, is_sub):
-        # data is one of the collectibles
-        m = data.message_type
-        q = data.queue_size
+    def _collect_message(self, datum):
+        m = datum.message_type
+        q = datum.queue_size
         if not m in self.msg_to_queue:
-            self.msg_to_queue[m] = ({}, {}) # in/out
-        counter = self.msg_to_queue[m][0 if is_sub else 1]
-        counter[q] = counter.get(q, 0) + 1
+            self.msg_to_queue[m] = []
+        self.msg_to_queue[m].append(q)
 
 
-    def pretty_print(self):
-        print ""
-        for msg, counters in self.msg_to_queue.iteritems():
-            print msg, "in:"
-            for q, n in counters[0].iteritems():
-                print "    {}: {}".format(q, n)
-            print msg, "out:"
-            for q, n in counters[1].iteritems():
-                print "    {}: {}".format(q, n)
+    _SUBSCRIBE_HEADERS = [
+        "Subscribe Calls", "Hardcoded Topics", "Global Topics",
+        "Use of TransportHints", "Function Callbacks", "Method Callbacks",
+        "Boost Function Callbacks", "Infinite Queues", "Median Queue Size",
+        "Min. Queue Size", "Max. Queue Size", "Hardcoded Queue Sizes",
+        "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting"
+    ]
+
+    def csv_subscribe(self):
+        return [SubscriberStatistics._SUBSCRIBE_HEADERS,
+            [self.total_subscribers, self.hardcoded_topics,
+                self.global_topics, self.transport_hints,
+                self.function_callbacks, self.method_callbacks,
+                self.boost_callbacks, self.infinite_queues,
+                median(self.hardcoded_queues), min(self.hardcoded_queues),
+                max(self.hardcoded_queues), len(self.hardcoded_queues),
+                median(self.nesting), min(self.nesting), max(self.nesting)
+            ]
+        ]
+
+class PublisherStatistics(object):
+    def __init__(self):
+        self.hardcoded_topics   = 0
+        self.latching_topics    = 0
+        self.hardcoded_queues   = []
+        self.infinite_queues    = 0
+        self.msg_to_queue       = {}
+        self.advertise_nesting  = []
+        self.publish_nesting    = []
+        self.global_topics      = 0
+        self.subscriber_status  = 0
+
+    @property
+    def total_publishers(self):
+        return len(self.advertise_nesting)
+
+    def collect_advertise(self, datum):
+        if isinstance(datum.topic, basestring):
+            self.hardcoded_topics += 1
+            if datum.topic.startswith("/"):
+                self.global_topics += 1
+        self.advertise_nesting.append(datum.nesting)
+        if isinstance(datum.queue_size, (int, long)):
+            self.hardcoded_queues.append(datum.queue_size)
+            if datum.queue_size == 0:
+                self.infinite_queues += 1
+            self._collect_message(datum)
+        if datum.latch:
+            self.latching += 1
+        if datum.overload == ADV_TYPE_2:
+            self.subscriber_status += 1
+
+    def collect_publish(self, datum):
+        self.publish_nesting.append(datum.nesting)
+
+    def _collect_message(self, datum):
+        m = datum.message_type
+        q = datum.queue_size
+        if not m in self.msg_to_queue:
+            self.msg_to_queue[m] = []
+        self.msg_to_queue[m].append(q)
+
+
+    _PUBLISH_HEADERS = [
+        "Advertise Calls", "Hardcoded Topics", "Global Topics",
+        "Latching Publishers", "Use of SubscriberStatus",
+        "Infinite Queues", "Median Queue Size", "Min. Queue Size",
+        "Max. Queue Size", "Hardcoded Queue Sizes",
+        "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting",
+        "Publish Calls", "Median Control Nesting",
+        "Min. Control Nesting", "Max. Control Nesting"
+    ]
+
+    def csv_publish(self):
+        return [PublisherStatistics._PUBLISH_HEADERS,
+            [self.total_publishers, self.hardcoded_topics, self.global_topics,
+                self.latching_topics, self.subscriber_status,
+                self.infinite_queues, median(self.hardcoded_queues),
+                min(self.hardcoded_queues), max(self.hardcoded_queues),
+                len(self.hardcoded_queues), median(self.advertise_nesting),
+                min(self.advertise_nesting), max(self.advertise_nesting),
+                len(self.publish_nesting), median(self.publish_nesting),
+                min(self.publish_nesting), max(self.publish_nesting)
+            ]
+        ]
+
+
+class RpcStatistics(object):
+    def __init__(self):
+        self.hardcoded_topics   = 0
+        self.server_nesting     = []
+        self.client_nesting     = []
+        self.global_topics      = 0
+        self.function_callbacks = 0
+        self.method_callbacks   = 0
+        self.boost_callbacks    = 0
+
+    @property
+    def total_rpc(self):
+        return len(self.server_nesting) + len(self.client_nesting)
+
+    def collect_server(self, datum):
+        if isinstance(datum.topic, basestring):
+            self.hardcoded_topics += 1
+            if datum.topic.startswith("/"):
+                self.global_topics += 1
+        self.server_nesting.append(datum.nesting)
+        if datum.overload == collectors.ADV_SRV_TYPE_1:
+            self.method_callbacks += 1
+        elif datum.overload == collectors.ADV_SRV_TYPE_2:
+            self.function_callbacks += 1
+        elif datum.overload == collectors.ADV_SRV_TYPE_3:
+            self.boost_callbacks += 1
+
+    def collect_client(self, datum):
+        if isinstance(datum.topic, basestring):
+            self.hardcoded_topics += 1
+            if datum.topic.startswith("/"):
+                self.global_topics += 1
+        self.client_nesting.append(datum.nesting)
+
+
+    _RPC_HEADERS = [
+        "Total Services", "Hardcoded Topics", "Global Topics",
+        "Service Servers", "Function Callbacks", "Method Callbacks",
+        "Boost Function Callbacks", "Median Control Nesting",
+        "Min. Control Nesting", "Max. Control Nesting",
+        "Service Clients", "Median Control Nesting",
+        "Min. Control Nesting", "Max. Control Nesting"
+    ]
+
+    def csv_service(self):
+        return [RpcStatistics._RPC_HEADERS,
+            [self.total_rpc, self.hardcoded_topics, self.global_topics,
+                len(self.server_nesting), self.function_callbacks,
+                self.method_callbacks, self.boost_callbacks,
+                median(self.server_nesting), min(self.server_nesting),
+                max(self.server_nesting), len(self.client_nesting),
+                median(self.client_nesting), min(self.client_nesting),
+                max(self.client_nesting)
+            ]
+        ]
+
+
+
+class GlobalCollector(object):
+    def __init__(self):
+        self.pub                = PublisherStatistics()
+        self.sub                = SubscriberStatistics()
+        self.rpc                = RpcStatistics()
+        self.total_rates        = 0
+        self.hardcoded_rates    = []
+        self.function_calls     = []
+        self.distinct_calls     = []
+
+    @property
+    def total_pub_sub(self):
+        return self.sub.total_subscribers + self.pub.total_publishers
+
+    @property
+    def total_rpc(self):
+        return self.rpc.total_rpc
+
+    @property
+    def global_topics(self):
+        return self.pub.global_topics + self.sub.global_topics \
+               + self.rpc.global_topics
+
+    @property
+    def function_callbacks(self):
+        return self.sub.function_callbacks + self.rpc.function_callbacks
+
+    @property
+    def method_callbacks(self):
+        return self.sub.method_callbacks + self.rpc.method_callbacks
+
+    @property
+    def boost_callbacks(self):
+        return self.sub.boost_callbacks + self.rpc.boost_callbacks
+
+    def collect(self, function_collector):
+        for datum in function_collector.subscribe:
+            self.sub.collect_subscribe(datum)
+        for datum in function_collector.advertise:
+            self.pub.collect_advertise(datum)
+        for datum in function_collector.publish:
+            self.pub.collect_publish(datum)
+        for datum in function_collector.advertise_service:
+            self.rpc.collect_server(datum)
+        for datum in function_collector.service_client:
+            self.rpc.collect_client(datum)
+        for datum in function_collector.spin_rate:
+            self.total_rates += 1
+            if isinstance(datum.rate, (int, long)):
+                self.hardcoded_rates.append(datum.rate)
+        self.function_calls.append(function_collector.function_calls)
+        self.distinct_calls.append(len(function_collector.function_set))
+
+    def collect_from_global_scope(self, global_scope):
+        assert isinstance(global_scope, CppGlobalScope)
+        data = [FunctionCollector(f) for f in collect_functions(global_scope)]
+        for collector in data:
+            self.collect(collector)
+        return data
+
+
+    _MSG_TYPE_HEADERS = [
+        "Message Type", "Median Subscriber Queue",
+        "Min. Subscriber Queue", "Max. Subscriber Queue",
+        "Median Publisher Queue",
+        "Min. Publisher Queue", "Max. Publisher Queue"
+    ]
+
+    def csv_message_types(self):
+        rows = [GlobalCollector._MSG_TYPE_HEADERS]
+        for msg, qs in self.sub.msg_to_queue.iteritems():
+            if not msg in self.pub.msg_to_queue:
+                rows.append([msg, median(qs), min(qs), max(qs), None, None, None])
+        for msg, qs in self.pub.msg_to_queue.iteritems():
+            inq = self.sub.msg_to_queue.get(msg)
+            if inq:
+                rows.append([msg, median(inq), min(inq), max(inq),
+                             median(qs), min(qs), max(qs)])
+            else:
+                rows.append([msg, None, None, None, median(qs), min(qs), max(qs)])
+        return rows
 
 
 
@@ -229,6 +468,7 @@ class FunctionCollector(object):
         self.spin_rate          = []
         self.sleep              = []
         self.function_set       = set()
+        self.function_calls     = 0
         for statement in function.body.body:
             self._collect(statement)
 
@@ -247,10 +487,9 @@ class FunctionCollector(object):
         name = variable.name
         if variable.result == "ros::Rate":
             if isinstance(variable.value, CppFunctionCall):
+                value = None
                 if len(variable.value.arguments) > 0:
                     value = variable.value.arguments[0]
-                else:
-                    value = 0
                 o = SpinRateTuple(value, name, self.function, variable.line)
                 self.spin_rate.append(o)
         elif variable.result == "ros::Publisher" \
@@ -269,6 +508,7 @@ class FunctionCollector(object):
                                 variable = call.arguments[0].name)
             return
         self.function_set.add(name)
+        self.function_calls += 1
         if name == "advertise" and call.result == "ros::Publisher":
             self._advertise_call(call, nesting, variable = variable)
         elif name == "subscribe" and call.result == "ros::Subscriber":
@@ -409,26 +649,6 @@ class FunctionCollector(object):
         return type_string
 
 
-    def has_results(self):
-        return self.subscribe or self.advertise or self.publish \
-                or self.advertise_service or self.service_client \
-                or self.spin_rate or self.sleep
-
-    def show_results(self):
-        for r in self.subscribe:
-            print "[{}] {} = subscribe({}, {}, {})".format(r[3], r[4], r[0], r[1], r[2])
-        for r in self.advertise:
-            print "[{}] {} = advertise<{}>({}, {})".format(r[3], r[4], r[2], r[0], r[1])
-        for r in self.publish:
-            print "[{}] {}.publish()".format(r[1], r[0])
-        for r in self.advertise_service:
-            print "[{}] {} = advertiseService({}, {})".format(r[2], r[3], r[0], r[1])
-        for r in self.service_client:
-            print "[{}] {} = serviceClient<{}>({})".format(r[2], r[3], r[1], r[0])
-        for r in self.spin_rate:
-            print r[0] + " spinning at " + str(r[1]) + "Hz"
-
-
 
 ###############################################################################
 # Helper Functions
@@ -444,3 +664,16 @@ def collect_functions(scope = None):
     for c in global_scope.classes:
         all_functions.extend(c.methods)
     return all_functions
+
+
+def median(values):
+    values = sorted(values)
+    n = len(values)
+    i = (n - 1) // 2
+    if (n % 2):
+        return values[i]
+    else:
+        return (values[i] + values[i+1]) / 2.0
+
+def mean(values):
+    return float(sum(values)) / max(len(values), 1)

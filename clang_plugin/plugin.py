@@ -10,6 +10,8 @@
 
 ###
 # standard packages
+from collections import namedtuple
+import csv
 import os
 
 ###
@@ -24,42 +26,48 @@ import clang_plugin.collectors as collectors
 
 
 ###############################################################################
+# Internal State
+###############################################################################
+
+InternalState = namedtuple("InternalState",
+                           ["index", "includes", "metrics", "pkg_metrics"])
+
+
+###############################################################################
 # HAROS Plugin Interface
 ###############################################################################
 
 def pre_analysis():
     clang.Config.set_library_path("/usr/lib/llvm-3.8/lib")
     index = clang.Index.create()
-    return (index, {}, [])
-    # index, include map, file collectors
+    return InternalState(index, {}, collectors.GlobalCollector(), {})
 
 
 def file_analysis(iface, scope):
     file_path   = scope.get_path()
-    index       = iface.state[0]
-    includes    = iface.state[1]
-    collection  = iface.state[2]
-    _find_includes(iface, scope.package, includes)
-    assert scope.package.id in includes
-    args = ["-I" + path for path in includes[scope.package.id]]
+    state       = iface.state
+    _find_includes(iface, scope.package, state.includes)
+    assert scope.package.id in state.includes
+    args = ["-I" + path for path in state.includes[scope.package.id]]
     args.append("-x")
     args.append("c++")
     # args.append("-std=c++11")
-    unit = index.parse(file_path, args)
+    unit = state.index.parse(file_path, args)
     # check for problems
     if unit.diagnostics:
         for d in unit.diagnostics:
             if d.severity >= clang.Diagnostic.Error:
                 print d
     # traverse nodes
-    data = _ast_analysis(unit, file_path)
-    _report_results(iface, data)
-    collection.append(data)
+    data = _ast_analysis(unit, file_path, scope.package, state)
+    # _report_results(iface, data)
 
 
 def post_analysis(iface):
-    gc = collectors.GlobalCollector(iface.state[2])
-    gc.pretty_print()
+    _export_subscriber_csv(iface)
+    _export_publisher_csv(iface)
+    _export_service_csv(iface)
+    _export_message_csv(iface)
 
 
 ###############################################################################
@@ -109,7 +117,7 @@ def _read_package_includes(iface, package, var_data):
 # Analyser
 ###############################################################################
 
-def _ast_analysis(unit, file_path):
+def _ast_analysis(unit, file_path, package, state):
     cursor = unit.cursor
     # we cannot reuse the same instance of global scope, or else we get stuff
     # from other files mixed in
@@ -117,10 +125,14 @@ def _ast_analysis(unit, file_path):
     for node in cursor.get_children():
         if node.location.file and node.location.file.name == file_path:
             global_scope.add_from_cursor(node)
-    return collectors.FileCollector.from_global_scope(global_scope)
+    if not package in state.pkg_metrics:
+        state.pkg_metrics[package] = collectors.GlobalCollector()
+    state.pkg_metrics[package].collect_from_global_scope(global_scope)
+    return state.metrics.collect_from_global_scope(global_scope)
 
 
 def _report_results(iface, data):
+    # TODO FIXME now data is a list of FunctionCollector
     _report_subscribe_data(iface, data)
     _report_advertise_data(iface, data)
     _report_publish_data(iface, data)
@@ -280,6 +292,40 @@ def _report_other_data(iface, data):
             iface.report_metric("spin_rate", datum.rate,
                                 function = datum.function)
     iface.report_metric("hardcoded_spin_rates", hardcoded_spin_rates)
+
+
+
+###############################################################################
+# Exporting Functions
+###############################################################################
+
+def _export_subscriber_csv(iface):
+    with open("subscriber.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        for row in iface.state.metrics.sub.csv_subscribe():
+            out.writerow(row)
+    iface.export_file("subscriber.csv")
+
+def _export_publisher_csv(iface):
+    with open("publisher.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        for row in iface.state.metrics.pub.csv_publish():
+            out.writerow(row)
+    iface.export_file("publisher.csv")
+
+def _export_service_csv(iface):
+    with open("service.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        for row in iface.state.metrics.rpc.csv_service():
+            out.writerow(row)
+    iface.export_file("service.csv")
+
+def _export_message_csv(iface):
+    with open("message.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        for row in iface.state.metrics.csv_message_types():
+            out.writerow(row)
+    iface.export_file("message.csv")
 
 
 
