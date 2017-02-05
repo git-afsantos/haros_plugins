@@ -90,7 +90,7 @@ class SubscriberStatistics(object):
             self.hardcoded_topics += 1
             if datum.topic.startswith("/"):
                 self.global_topics += 1
-        self.subscribe_nesting.append(datum.nesting)
+        self.nesting.append(datum.nesting)
         if isinstance(datum.queue_size, (int, long)):
             self.hardcoded_queues.append(datum.queue_size)
             if datum.queue_size == 0:
