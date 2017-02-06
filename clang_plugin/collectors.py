@@ -116,22 +116,33 @@ class SubscriberStatistics(object):
     _SUBSCRIBE_HEADERS = [
         "Subscribe Calls", "Hardcoded Topics", "Global Topics",
         "Use of TransportHints", "Function Callbacks", "Method Callbacks",
-        "Boost Function Callbacks", "Infinite Queues", "Median Queue Size",
-        "Min. Queue Size", "Max. Queue Size", "Hardcoded Queue Sizes",
+        "Boost Function Callbacks", "Hardcoded Queue Sizes", "Infinite Queues",
+        "Median Queue Size", "Min. Queue Size", "Max. Queue Size",
         "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting"
     ]
 
     def csv_subscribe(self):
-        return [SubscriberStatistics._SUBSCRIBE_HEADERS,
-            [self.total_subscribers, self.hardcoded_topics,
+        rows = [SubscriberStatistics._SUBSCRIBE_HEADERS]
+        if not self.total_subscribers:
+            return rows
+        data = [self.total_subscribers, self.hardcoded_topics,
                 self.global_topics, self.transport_hints,
                 self.function_callbacks, self.method_callbacks,
-                self.boost_callbacks, self.infinite_queues,
-                median(self.hardcoded_queues), min(self.hardcoded_queues),
-                max(self.hardcoded_queues), len(self.hardcoded_queues),
-                median(self.nesting), min(self.nesting), max(self.nesting)
-            ]
-        ]
+                self.boost_callbacks]
+        if self.hardcoded_queues:
+            data.extend([len(self.hardcoded_queues), self.infinite_queues,
+                         median(self.hardcoded_queues),
+                         min(self.hardcoded_queues), max(self.hardcoded_queues)])
+        else:
+            data.extend([0, 0, None, None, None])
+        if self.nesting:
+            data.extend([median(self.nesting), min(self.nesting),
+                         max(self.nesting)])
+        else:
+            data.extend([None, None, None])
+        rows.append(data)
+        return rows
+
 
 class PublisherStatistics(object):
     def __init__(self):
@@ -179,25 +190,35 @@ class PublisherStatistics(object):
     _PUBLISH_HEADERS = [
         "Advertise Calls", "Hardcoded Topics", "Global Topics",
         "Latching Publishers", "Use of SubscriberStatus",
-        "Infinite Queues", "Median Queue Size", "Min. Queue Size",
-        "Max. Queue Size", "Hardcoded Queue Sizes",
+        "Hardcoded Queue Sizes", "Infinite Queues", "Median Queue Size",
+        "Min. Queue Size", "Max. Queue Size",
         "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting",
         "Publish Calls", "Median Control Nesting",
         "Min. Control Nesting", "Max. Control Nesting"
     ]
 
     def csv_publish(self):
-        return [PublisherStatistics._PUBLISH_HEADERS,
-            [self.total_publishers, self.hardcoded_topics, self.global_topics,
-                self.latching_topics, self.subscriber_status,
-                self.infinite_queues, median(self.hardcoded_queues),
-                min(self.hardcoded_queues), max(self.hardcoded_queues),
-                len(self.hardcoded_queues), median(self.advertise_nesting),
-                min(self.advertise_nesting), max(self.advertise_nesting),
-                len(self.publish_nesting), median(self.publish_nesting),
-                min(self.publish_nesting), max(self.publish_nesting)
-            ]
-        ]
+        rows = [PublisherStatistics._PUBLISH_HEADERS]
+        data = [self.total_publishers, self.hardcoded_topics,
+                self.global_topics, self.latching_topics, self.subscriber_status]
+        if self.hardcoded_queues:
+            data.extend([len(self.hardcoded_queues), self.infinite_queues,
+                         median(self.hardcoded_queues),
+                         min(self.hardcoded_queues), max(self.hardcoded_queues)])
+        else:
+            data.extend([0, 0, None, None, None])
+        if self.advertise_nesting:
+            data.extend([median(self.advertise_nesting),
+                         min(self.advertise_nesting), max(self.advertise_nesting)])
+        else:
+            data.extend([None, None, None])
+        if self.publish_nesting:
+            data.extend([len(self.publish_nesting), median(self.publish_nesting),
+                         min(self.publish_nesting), max(self.publish_nesting)])
+        else:
+            data.extend([0, None, None, None])
+        rows.append(data)
+        return rows
 
 
 class RpcStatistics(object):
@@ -245,16 +266,17 @@ class RpcStatistics(object):
     ]
 
     def csv_service(self):
-        return [RpcStatistics._RPC_HEADERS,
-            [self.total_rpc, self.hardcoded_topics, self.global_topics,
-                len(self.server_nesting), self.function_callbacks,
-                self.method_callbacks, self.boost_callbacks,
-                median(self.server_nesting), min(self.server_nesting),
-                max(self.server_nesting), len(self.client_nesting),
-                median(self.client_nesting), min(self.client_nesting),
-                max(self.client_nesting)
-            ]
-        ]
+        rows = [RpcStatistics._RPC_HEADERS]
+        if self.total_rpc:
+            rows.append([self.total_rpc, self.hardcoded_topics,
+                self.global_topics, len(self.server_nesting),
+                self.function_callbacks, self.method_callbacks,
+                self.boost_callbacks, median(self.server_nesting),
+                min(self.server_nesting), max(self.server_nesting),
+                len(self.client_nesting), median(self.client_nesting),
+                min(self.client_nesting), max(self.client_nesting)
+            ])
+        return rows
 
 
 
