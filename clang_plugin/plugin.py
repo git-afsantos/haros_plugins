@@ -68,6 +68,10 @@ def post_analysis(iface):
     _export_publisher_csv(iface)
     _export_service_csv(iface)
     _export_message_csv(iface)
+    _export_param_csv(iface)
+    _export_param_type_csv(iface)
+    _export_other(iface)
+
 
 
 ###############################################################################
@@ -132,6 +136,9 @@ def _ast_analysis(unit, file_path, package, state):
 
 
 def _report_results(iface, data):
+    for fc in data:
+        iface.report_metric("function_calls", fc.function_calls)
+        iface.report_metric("unique_function_calls", len(fc.function_set))
     # TODO FIXME now data is a list of FunctionCollector
     _report_subscribe_data(iface, data)
     _report_advertise_data(iface, data)
@@ -362,6 +369,39 @@ def _export_message_csv(iface):
         for row in iface.state.metrics.csv_message_types():
             out.writerow(row)
     iface.export_file("message.csv")
+
+def _export_param_csv(iface):
+    with open("param.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        rows = iface.state.metrics.param.csv_param()
+        for row in rows:
+            out.writerow(row)
+    iface.export_file("param.csv")
+    headers = rows[0]
+    headers.insert(0, "Package")
+    with open("param_pkg.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        out.writerow(headers)
+        for pkg, metrics in iface.state.pkg_metrics.iteritems():
+            rows = metrics.param.csv_param()[1:]
+            for row in rows:
+                row.insert(0, pkg)
+                out.writerow(row)
+    iface.export_file("param_pkg.csv")
+
+def _export_param_type_csv(iface):
+    with open("param_type.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        for row in iface.state.metrics.csv_param_type():
+            out.writerow(row)
+    iface.export_file("param_type.csv")
+
+def _export_other(iface):
+    with open("other.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        for row in iface.state.metrics.csv_other():
+            out.writerow(row)
+    iface.export_file("other.csv")
 
 
 

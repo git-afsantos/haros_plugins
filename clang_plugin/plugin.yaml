@@ -144,3 +144,5 @@ supported_metrics:
     - function_callbacks
     - method_callbacks
     - boost_callbacks
+    - function_calls
+    - unique_function_calls

@@ -1,7 +1,7 @@
 
 ###
 # standard packages
-from collections import namedtuple
+from collections import namedtuple, Counter
 
 ###
 # internal packages
@@ -62,6 +62,9 @@ ServiceClientTuple = namedtuple("ServiceClientTuple",
 SpinRateTuple = namedtuple("SpinRateTuple",
                            ["rate", "variable", "function", "line"])
 
+ParamTuple = namedtuple("ParamTuple", ["param", "variable", "default",
+                                       "param_type", "function", "line"])
+
 
 
 ###############################################################################
@@ -114,9 +117,9 @@ class SubscriberStatistics(object):
 
 
     _SUBSCRIBE_HEADERS = [
-        "Subscribe Calls", "Hardcoded Topics", "Global Topics",
+        "Subscribe Calls", "Hard-coded Topics", "Global Topics",
         "Use of TransportHints", "Function Callbacks", "Method Callbacks",
-        "Boost Function Callbacks", "Hardcoded Queue Sizes", "Infinite Queues",
+        "Boost Function Callbacks", "Hard-coded Queue Sizes", "Infinite Queues",
         "Median Queue Size", "Min. Queue Size", "Max. Queue Size",
         "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting"
     ]
@@ -188,9 +191,9 @@ class PublisherStatistics(object):
 
 
     _PUBLISH_HEADERS = [
-        "Advertise Calls", "Hardcoded Topics", "Global Topics",
+        "Advertise Calls", "Hard-coded Topics", "Global Topics",
         "Latching Publishers", "Use of SubscriberStatus",
-        "Hardcoded Queue Sizes", "Infinite Queues", "Median Queue Size",
+        "Hard-coded Queue Sizes", "Infinite Queues", "Median Queue Size",
         "Min. Queue Size", "Max. Queue Size",
         "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting",
         "Publish Calls", "Median Control Nesting",
@@ -257,7 +260,7 @@ class RpcStatistics(object):
 
 
     _RPC_HEADERS = [
-        "Total Services", "Hardcoded Topics", "Global Topics",
+        "Total Services", "Hard-coded Topics", "Global Topics",
         "Service Servers", "Function Callbacks", "Method Callbacks",
         "Boost Function Callbacks", "Median Control Nesting",
         "Min. Control Nesting", "Max. Control Nesting",
@@ -279,12 +282,53 @@ class RpcStatistics(object):
         return rows
 
 
+class ParamStatistics(object):
+    def __init__(self):
+        self.total_params       = 0
+        self.hardcoded_params   = 0
+        self.global_params      = 0
+        self.defaults           = 0
+        self.param_type         = Counter()
+
+    def collect_param(self, datum):
+        self.total_params += 1
+        if isinstance(datum.param, basestring):
+            self.hardcoded_params += 1
+            if datum.param.startswith("/"):
+                self.global_params += 1
+            if datum.default:
+                self.defaults += 1
+        if datum.param_type:
+            self.param_type[datum.param_type] += 1
+
+    _PARAM_HEADERS = [
+        "Total Parameters", "Hard-coded Parameters",
+        "Global Parameters", "Uses Default Value"
+    ]
+
+    def csv_param(self):
+        rows = [ParamStatistics._PARAM_HEADERS]
+        if self.total_params:
+            rows.append([self.total_params, self.hardcoded_params,
+                self.global_params, self.defaults
+            ])
+        return rows
+
+    _TYPE_HEADERS = ["Parameter Type", "Count"]
+
+    def csv_param_type(self):
+        rows = [[t, c] for t, c in self.param_type.iteritems()]
+        rows.insert(0, ParamStatistics._TYPE_HEADERS)
+        return rows
+
+
 
 class GlobalCollector(object):
     def __init__(self):
         self.pub                = PublisherStatistics()
         self.sub                = SubscriberStatistics()
         self.rpc                = RpcStatistics()
+        self.param              = ParamStatistics()
         self.total_rates        = 0
         self.hardcoded_rates    = []
         self.function_calls     = []
@@ -326,6 +370,8 @@ class GlobalCollector(object):
             self.rpc.collect_server(datum)
         for datum in function_collector.service_client:
             self.rpc.collect_client(datum)
+        for datum in function_collector.ros_parameters:
+            self.param.collect_param(datum)
         for datum in function_collector.spin_rate:
             self.total_rates += 1
             if isinstance(datum.rate, (int, long)):
@@ -360,6 +406,30 @@ class GlobalCollector(object):
                              median(qs), min(qs), max(qs)])
             else:
                 rows.append([msg, None, None, None, median(qs), min(qs), max(qs)])
+        return rows
+
+    _OTHER_HEADERS = [
+        "Spin Rates", "Hard-coded Spin Rates", "Median Spin Rate",
+        "Min. Spin Rate", "Max. Spin Rate", "Median Function Calls",
+        "Min. Function Calls", "Max. Function Calls", "Median Unique Calls",
+        "Min. Unique Calls", "Max. Unique Calls"
+    ]
+
+    def csv_other(self):
+        rows = [GlobalCollector._OTHER_HEADERS]
+        data = [self.total_rates]
+        if self.hardcoded_rates:
+            data.extend([len(self.hardcoded_rates), median(self.hardcoded_rates),
+                         min(self.hardcoded_rates), max(self.hardcoded_rates)])
+        else:
+            data.extend([0, None, None, None])
+        if self.function_calls:
+            data.extend([median(self.function_calls), min(self.function_calls),
+                         max(self.function_calls), median(self.distinct_calls),
+                         min(self.distinct_calls), max(self.distinct_calls)])
+        else:
+            data.extend([None, None, None, None, None, None])
+        rows.append(data)
         return rows
 
 
@@ -489,6 +559,7 @@ class FunctionCollector(object):
         self.service_client     = []
         self.spin_rate          = []
         self.sleep              = []
+        self.ros_parameters     = []
         self.function_set       = set()
         self.function_calls     = 0
         for statement in function.body.body:
@@ -520,8 +591,12 @@ class FunctionCollector(object):
                 or variable.result == "ros::ServiceClient":
             if isinstance(variable.value, CppFunctionCall):
                 self._from_call(variable.value, nesting, variable = name)
+        elif isinstance(variable.value, CppFunctionCall) \
+                and variable.value.name == "param":
+            self._from_call(variable.value, nesting, variable = name)
 
     def _from_call(self, call, nesting, variable = None):
+        # TODO a function map seems better by now...
         name = call.name
         if name == "operator=":
             call.simplify()
@@ -549,6 +624,12 @@ class FunctionCollector(object):
                 and call.method_of.result == "ros::Rate":
             call.simplify()
             self.sleep.append(call)
+        elif name == "param":
+            call.simplify()
+            self._param_call(call, nesting, variable = variable)
+        elif name == "getParam" or name == "getParamCached":
+            call.simplify()
+            self._get_param_call(call, nesting, variable = variable)
 
 
     def _advertise_call(self, call, nesting, variable = None):
@@ -648,6 +729,27 @@ class FunctionCollector(object):
         self.service_client.append(ServiceClientTuple(service,
                 call.template, nesting, variable, self.function,
                 call.line, ctype))
+
+    def _param_call(self, call, nesting, variable = None):
+        n = len(call.arguments)
+        if n == 2:      # T param(std::string &key, T &default_val)
+            result = call.result
+        elif n == 3:    # void param(std::string &key, T &val, T &default_val)
+            result = None
+            if call.arguments[1]:
+                variable = call.arguments[1].name
+                result = call.arguments[1].result
+        self.ros_parameters.append(ParamTuple(call.arguments[0],
+                variable, True, result, self.function, call.line))
+
+    def _get_param_call(self, call, nesting, variable = None):
+        if len(call.arguments) >= 2:
+            result = None
+            if call.arguments[1]:
+                variable = call.arguments[1].name
+                result = call.arguments[1].result
+            self.ros_parameters.append(ParamTuple(call.arguments[0],
+                    variable, False, result, self.function, call.line))
 
 
     def _msg_type_from_callback(self, callback):
