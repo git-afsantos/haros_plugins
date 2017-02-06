@@ -302,23 +302,59 @@ def _report_other_data(iface, data):
 def _export_subscriber_csv(iface):
     with open("subscriber.csv", "w") as csvfile:
         out = csv.writer(csvfile)
-        for row in iface.state.metrics.sub.csv_subscribe():
+        rows = iface.state.metrics.sub.csv_subscribe()
+        for row in rows:
             out.writerow(row)
     iface.export_file("subscriber.csv")
+    headers = rows[0]
+    headers.insert(0, "Package")
+    with open("subscriber_pkg.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        out.writerow(headers)
+        for pkg, metrics in iface.state.pkg_metrics.iteritems():
+            rows = metrics.sub.csv_subscribe()[1:]
+            for row in rows:
+                row.insert(0, pkg)
+                out.writerow(row)
+    iface.export_file("subscriber_pkg.csv")
 
 def _export_publisher_csv(iface):
     with open("publisher.csv", "w") as csvfile:
         out = csv.writer(csvfile)
-        for row in iface.state.metrics.pub.csv_publish():
+        rows = iface.state.metrics.pub.csv_publish()
+        for row in rows:
             out.writerow(row)
     iface.export_file("publisher.csv")
+    headers = rows[0]
+    headers.insert(0, "Package")
+    with open("publisher_pkg.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        out.writerow(headers)
+        for pkg, metrics in iface.state.pkg_metrics.iteritems():
+            rows = metrics.pub.csv_publish()[1:]
+            for row in rows:
+                row.insert(0, pkg)
+                out.writerow(row)
+    iface.export_file("publisher_pkg.csv")
 
 def _export_service_csv(iface):
     with open("service.csv", "w") as csvfile:
         out = csv.writer(csvfile)
-        for row in iface.state.metrics.rpc.csv_service():
+        rows = iface.state.metrics.rpc.csv_service()
+        for row in rows:
             out.writerow(row)
     iface.export_file("service.csv")
+    headers = rows[0]
+    headers.insert(0, "Package")
+    with open("service_pkg.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        out.writerow(headers)
+        for pkg, metrics in iface.state.pkg_metrics.iteritems():
+            rows = metrics.rpc.csv_service()[1:]
+            for row in rows:
+                row.insert(0, pkg)
+                out.writerow(row)
+    iface.export_file("service_pkg.csv")
 
 def _export_message_csv(iface):
     with open("message.csv", "w") as csvfile:
