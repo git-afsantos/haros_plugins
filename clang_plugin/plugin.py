@@ -392,7 +392,7 @@ def _export_param_csv(iface):
 def _export_param_type_csv(iface):
     with open("param_type.csv", "w") as csvfile:
         out = csv.writer(csvfile)
-        for row in iface.state.metrics.csv_param_type():
+        for row in iface.state.metrics.param.csv_param_type():
             out.writerow(row)
     iface.export_file("param_type.csv")
 
