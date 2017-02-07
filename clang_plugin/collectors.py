@@ -271,14 +271,21 @@ class RpcStatistics(object):
     def csv_service(self):
         rows = [RpcStatistics._RPC_HEADERS]
         if self.total_rpc:
-            rows.append([self.total_rpc, self.hardcoded_topics,
-                self.global_topics, len(self.server_nesting),
-                self.function_callbacks, self.method_callbacks,
-                self.boost_callbacks, median(self.server_nesting),
-                min(self.server_nesting), max(self.server_nesting),
-                len(self.client_nesting), median(self.client_nesting),
-                min(self.client_nesting), max(self.client_nesting)
-            ])
+            data = [self.total_rpc, self.hardcoded_topics, self.global_topics,
+                    len(self.server_nesting), self.function_callbacks,
+                    self.method_callbacks, self.boost_callbacks
+            ]
+            if self.server_nesting:
+                data.extend([median(self.server_nesting),
+                        min(self.server_nesting), max(self.server_nesting)])
+            else:
+                data.extend([None, None, None])
+            if self.client_nesting:
+                data.extend([len(self.client_nesting),
+                        median(self.client_nesting),
+                        min(self.client_nesting), max(self.client_nesting)])
+            else:
+                data.extend([0, None, None, None])
         return rows
 
 
