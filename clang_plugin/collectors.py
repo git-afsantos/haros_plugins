@@ -244,11 +244,11 @@ class RpcStatistics(object):
             if datum.topic.startswith("/"):
                 self.global_topics += 1
         self.server_nesting.append(datum.nesting)
-        if datum.overload == collectors.ADV_SRV_TYPE_1:
+        if datum.overload == ADV_SRV_TYPE_1:
             self.method_callbacks += 1
-        elif datum.overload == collectors.ADV_SRV_TYPE_2:
+        elif datum.overload == ADV_SRV_TYPE_2:
             self.function_callbacks += 1
-        elif datum.overload == collectors.ADV_SRV_TYPE_3:
+        elif datum.overload == ADV_SRV_TYPE_3:
             self.boost_callbacks += 1
 
     def collect_client(self, datum):
