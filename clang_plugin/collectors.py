@@ -286,6 +286,7 @@ class RpcStatistics(object):
                         min(self.client_nesting), max(self.client_nesting)])
             else:
                 data.extend([0, None, None, None])
+            rows.append(data)
         return rows
 
 
