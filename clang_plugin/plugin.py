@@ -8,6 +8,13 @@
 # might be interesting
 # https://github.com/pybee-attic/sealang
 
+# Install
+# sudo pip install clang
+# sudo apt-get install libclang-3.8-dev
+#   optional, currently hard-coded:
+# set up LD_LIBRARY_PATH to point to the libclang.so shared library
+# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/llvm-3.8/lib
+
 ###
 # standard packages
 from collections import namedtuple
