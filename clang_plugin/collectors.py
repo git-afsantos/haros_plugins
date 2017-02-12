@@ -7,11 +7,17 @@ from collections import namedtuple, Counter
 # internal packages
 from clang_plugin.cpp_model import CppBlock, CppControlFlow, CppFunction, \
                                    CppFunctionCall, CppDefaultArgument, \
-                                   CppGlobalScope, CppOperator, CppVariable
+                                   CppGlobalScope, CppOperator, CppVariable, \
+                                   CppStatement
 
 ###############################################################################
 # Collectibles
 ###############################################################################
+
+advertise_count = 0
+subscribe_count = 0
+pubsub_var = 0
+collected_functions = 0
 
 SUB_TYPE_1 = "subscribe(string topic, uint32_t queue_size, " \
              "void method(M), T *obj, TransportHints)"
@@ -583,8 +589,19 @@ class FunctionCollector(object):
             for branch in statement.branches:
                 for stmt in branch[1].body:
                     self._collect(stmt, nesting = nesting + 1)
+        elif isinstance(statement, CppBlock):
+            for stmt in statement.body:
+                self._collect(stmt, nesting)
+        elif isinstance(statement, CppStatement):
+            if statement.value:
+                self._collect(statement.value, nesting)
+        elif isinstance(statement, CppOperator):
+            if statement.name == "=" or statement.name == "[op]":
+                for arg in statement.arguments:
+                    self._collect(arg, nesting)
 
     def _from_variable(self, variable, nesting):
+        global pubsub_var
         name = variable.name
         if variable.result == "ros::Rate":
             if isinstance(variable.value, CppFunctionCall):
@@ -597,6 +614,8 @@ class FunctionCollector(object):
                 or variable.result == "ros::Subscriber" \
                 or variable.result == "ros::ServiceServer" \
                 or variable.result == "ros::ServiceClient":
+            if variable.result == "ros::Publisher" or variable.result == "ros::Subscriber":
+                pubsub_var += 1
             if isinstance(variable.value, CppFunctionCall):
                 self._from_call(variable.value, nesting, variable = name)
         elif isinstance(variable.value, CppFunctionCall) \
@@ -604,19 +623,25 @@ class FunctionCollector(object):
             self._from_call(variable.value, nesting, variable = name)
 
     def _from_call(self, call, nesting, variable = None):
+        global advertise_count
+        global subscribe_count
         # TODO a function map seems better by now...
         name = call.name
         if name == "operator=":
             call.simplify()
-            if isinstance(call.arguments[1], CppFunctionCall):
+            if len(call.arguments) >= 2 and isinstance(call.arguments[1], CppFunctionCall):
                 self._from_call(call.arguments[1], nesting,
                                 variable = call.arguments[0].name)
+            elif len(call.arguments) < 2:
+                print "[CLANG]", name, call.arguments
             return
         self.function_set.add(name)
         self.function_calls += 1
         if name == "advertise" and call.result == "ros::Publisher":
+            advertise_count += 1
             self._advertise_call(call, nesting, variable = variable)
         elif name == "subscribe" and call.result == "ros::Subscriber":
+            subscribe_count += 1
             self._subscribe_call(call, nesting, variable = variable)
         elif name == "publish" and call.method_of \
                 and call.method_of.result == "ros::Publisher":
@@ -764,7 +789,7 @@ class FunctionCollector(object):
         type_string = callback.result
         type_string = type_string.split(None, 1)[1]
         if not (type_string[0] == "(" and type_string[-1] == ")"):
-            print "Unknown message type:", type_string
+            print "[CLANG] Unknown message type:", type_string
             return type_string
         type_string = type_string[1:-1]
         is_const = type_string.startswith("const ")
@@ -789,14 +814,21 @@ class FunctionCollector(object):
 ###############################################################################
 
 def collect_functions(scope = None):
+    global collected_functions
     global_scope = scope or CppGlobalScope.INSTANCE
     all_functions = list(global_scope.functions)
-    for n in global_scope.namespaces:
-        all_functions.extend(n.functions)
-        for c in n.classes:
-            all_functions.extend(c.methods)
     for c in global_scope.classes:
-        all_functions.extend(c.methods)
+        all_functions.extend(c.functions)
+    s = list(global_scope.namespaces)
+    while s:
+        ns = s
+        s = []
+        for n in ns:
+            all_functions.extend(n.functions)
+            for c in n.classes:
+                all_functions.extend(c.functions)
+            s.extend(n.namespaces)
+    collected_functions += len(all_functions)
     return all_functions
 
 

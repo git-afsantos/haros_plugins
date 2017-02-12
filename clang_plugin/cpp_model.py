@@ -7,6 +7,10 @@ from ctypes import ArgumentError
 # third-party packages
 import clang.cindex as clang
 
+advertise_list = []
+subscribe_list = []
+function_counter = 0
+
 ###############################################################################
 # Base Class for Language Constructs
 ###############################################################################
@@ -240,6 +244,12 @@ class CppFunctionCall(CppExpression):
     def _traverse(self, cursor):
         if cursor.kind == clang.CursorKind.CALL_EXPR and cursor.spelling:
             self.name = cursor.spelling
+
+            if self.name == "advertise":
+                advertise_list.append(self.result)
+            elif self.name == "subscribe":
+                subscribe_list.append(self.result)
+
             self.is_constructor = self.result.split("::")[-1] == self.name
             args = list(cursor.get_arguments())
             children = [c for c in cursor.get_children() if not c in args]
@@ -357,7 +367,9 @@ class CppControlFlow(CppBasicEntity):
         children = list(cursor.get_children())
         assert len(children) >= 2
         var = _parse(children[0], scope = self, lazy = True)
-        assert children[1].kind == clang.CursorKind.COMPOUND_STMT
+        if not children[1].kind == clang.CursorKind.COMPOUND_STMT:
+            print "switch child is", children[1].kind
+            return []
         branches = []
         condition = True
         body = None
@@ -610,6 +622,7 @@ class CppFunction(CppNamedEntity):
             self.parameters     = []
             self.body           = CppBlock(self)
             self.is_constructor = False
+            self.is_destructor  = False
         else:
             self._read_cursor(cursor)
 
@@ -618,6 +631,8 @@ class CppFunction(CppNamedEntity):
                 or cursor.kind == clang.CursorKind.CXX_METHOD \
                 or cursor.kind == clang.CursorKind.CONSTRUCTOR \
                 or cursor.kind == clang.CursorKind.DESTRUCTOR
+        global function_counter
+        function_counter += 1
         CppNamedEntity._read_cursor(self, cursor)
         self.signature      = cursor.displayname
         self.result         = cursor.result_type.spelling
@@ -665,42 +680,57 @@ class CppClass(CppNamedEntity):
         CppNamedEntity.__init__(self, scope)
         if cursor is None:
             self.children       = []
-            self.fields         = []
-            self.methods        = []
-            self.constructors   = []
-            self.destructors    = []
+            #self.fields         = []
+            #self.methods        = []
+            #self.constructors   = []
+            #self.destructors    = []
             self.superclasses   = []
         else:
             self._read_cursor(cursor)
+
+    @property
+    def functions(self):
+        return [c for c in self.children if isinstance(c, CppFunction)]
+
+    @property
+    def fields(self):
+        return [c for c in self.children if isinstance(c, CppVariable)]
+
+    @property
+    def methods(self):
+        return [c for c in self.children \
+                  if isinstance(c, CppFunction) and c.is_method]
+
+    @property
+    def constructors(self):
+        return [c for c in self.children \
+                  if isinstance(c, CppFunction) and c.is_constructor]
+
+    @property
+    def destructors(self):
+        return [c for c in self.children \
+                  if isinstance(c, CppFunction) and c.is_destructor]
 
     def _read_cursor(self, cursor):
         assert cursor.kind == clang.CursorKind.CLASS_DECL
         CppNamedEntity._read_cursor(self, cursor)
         self.children       = []
-        self.fields         = []
-        self.methods        = []
-        self.constructors   = []
-        self.destructors    = []
+        #self.fields         = []
+        #self.methods        = []
+        #self.constructors   = []
+        #self.destructors    = []
         self.superclasses   = []
         CppBasicEntity._traverse(self, cursor)
 
     def _traverse(self, cursor):
         if cursor.kind == clang.CursorKind.CXX_METHOD:
-            child = CppFunction(self, cursor = cursor)
-            self.children.append(child)
-            self.methods.append(child)
+            self.children.append(CppFunction(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.FIELD_DECL:
-            child = CppVariable(self, cursor = cursor)
-            self.children.append(child)
-            self.fields.append(child)
+            self.children.append(CppVariable(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.CONSTRUCTOR:
-            child = CppFunction(self, cursor = cursor)
-            self.children.append(child)
-            self.constructors.append(child)
+            self.children.append(CppFunction(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.DESTRUCTOR:
-            child = CppFunction(self, cursor = cursor)
-            self.children.append(child)
-            self.destructors.append(child)
+            self.children.append(CppFunction(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.CXX_BASE_SPECIFIER:
             self.superclasses.append(cursor.spelling)
         else:
@@ -725,37 +755,49 @@ class CppNamespace(CppNamedEntity):
         CppNamedEntity.__init__(self, scope)
         if cursor is None:
             self.children   = []
-            self.variables  = []
-            self.functions  = []
-            self.classes    = []
+            #self.variables  = []
+            #self.functions  = []
+            #self.classes    = []
         else:
             self._read_cursor(cursor)
+
+    @property
+    def namespaces(self):
+        return [c for c in self.children if isinstance(c, CppNamespace)]
+
+    @property
+    def classes(self):
+        return [c for c in self.children if isinstance(c, CppClass)]
+
+    @property
+    def functions(self):
+        return [c for c in self.children if isinstance(c, CppFunction)]
+
+    @property
+    def variables(self):
+        return [c for c in self.children if isinstance(c, CppVariable)]
 
     def _read_cursor(self, cursor):
         assert cursor.kind == clang.CursorKind.NAMESPACE
         CppNamedEntity._read_cursor(self, cursor)
         self.children   = []
-        self.variables  = []
-        self.functions  = []
-        self.classes    = []
+        #self.variables  = []
+        #self.functions  = []
+        #self.classes    = []
         CppBasicEntity._traverse(self, cursor)
 
     def _traverse(self, cursor):
         if cursor.kind == clang.CursorKind.CLASS_DECL:
-            child = CppClass(self, cursor = cursor)
-            self.children.append(child)
-            self.classes.append(child)
+            self.children.append(CppClass(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.FUNCTION_DECL \
                 or cursor.kind == clang.CursorKind.CXX_METHOD \
                 or cursor.kind == clang.CursorKind.CONSTRUCTOR \
                 or cursor.kind == clang.CursorKind.DESTRUCTOR:
-            child = CppFunction(self, cursor = cursor)
-            self.children.append(child)
-            self.functions.append(child)
+            self.children.append(CppFunction(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.VAR_DECL:
-            child = CppVariable(self, cursor = cursor)
-            self.children.append(child)
-            self.variables.append(child)
+            self.children.append(CppVariable(self, cursor = cursor))
+        elif cursor.kind == clang.CursorKind.NAMESPACE:
+            self.children.append(CppNamespace(self, cursor = cursor))
         else:
             CppBasicEntity._traverse(self, cursor)
 
@@ -773,28 +815,36 @@ class CppGlobalScope(object):
     def __init__(self):
         self.id         = "<global>"
         self.children   = []
-        self.namespaces = []
-        self.classes    = []
-        self.functions  = []
-        self.variables  = []
+        #self.namespaces = []   maybe lists of visitors
+        #self.classes    = []
+        #self.functions  = []
+        #self.variables  = []
+
+    @property
+    def namespaces(self):
+        return [c for c in self.children if isinstance(c, CppNamespace)]
+
+    @property
+    def classes(self):
+        return [c for c in self.children if isinstance(c, CppClass)]
+
+    @property
+    def functions(self):
+        return [c for c in self.children if isinstance(c, CppFunction)]
+
+    @property
+    def variables(self):
+        return [c for c in self.children if isinstance(c, CppVariable)]
 
     def add_from_cursor(self, cursor):
         if cursor.kind == clang.CursorKind.NAMESPACE:
-            child = CppNamespace(self, cursor = cursor)
-            self.children.append(child)
-            self.namespaces.append(child)
+            self.children.append(CppNamespace(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.CLASS_DECL:
-            child = CppClass(self, cursor = cursor)
-            self.children.append(child)
-            self.classes.append(child)
+            self.children.append(CppClass(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.FUNCTION_DECL:
-            child = CppFunction(self, cursor = cursor)
-            self.children.append(child)
-            self.functions.append(child)
+            self.children.append(CppFunction(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.VAR_DECL:
-            child = CppVariable(self, cursor = cursor)
-            self.children.append(child)
-            self.variables.append(child)
+            self.children.append(CppVariable(self, cursor = cursor))
 
     def pretty_str(self):
         return "\n\n".join([c.pretty_str() for c in self.children])

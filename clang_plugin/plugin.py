@@ -17,9 +17,10 @@
 
 ###
 # standard packages
-from collections import namedtuple
+from collections import namedtuple, Counter
 import csv
 import os
+import time
 
 ###
 # third-party packages
@@ -28,7 +29,8 @@ import clang.cindex as clang
 ###
 # internal packages
 from cmake_analyser.analyser import CMakeAnalyser
-from clang_plugin.cpp_model import CppGlobalScope
+from clang_plugin.cpp_model import CppGlobalScope, advertise_list as ADVERTISE, subscribe_list as SUBSCRIBE
+import clang_plugin.cpp_model as model
 import clang_plugin.collectors as collectors
 
 
@@ -36,8 +38,13 @@ import clang_plugin.collectors as collectors
 # Internal State
 ###############################################################################
 
+LIB_PATH = "/usr/lib/llvm-3.8/lib"
+DB_PATH = "/home/andre/catkin_ws/build"
+STD_INCLUDES = "/usr/lib/llvm-3.8/lib/clang/3.8.0/include"
+
+
 InternalState = namedtuple("InternalState",
-                           ["index", "includes", "metrics", "pkg_metrics"])
+                           ["database", "start", "metrics", "pkg_metrics"])
 
 
 ###############################################################################
@@ -45,29 +52,27 @@ InternalState = namedtuple("InternalState",
 ###############################################################################
 
 def pre_analysis():
-    clang.Config.set_library_path("/usr/lib/llvm-3.8/lib")
-    index = clang.Index.create()
-    return InternalState(index, {}, collectors.GlobalCollector(), {})
+    clang.Config.set_library_path(LIB_PATH)
+    db = clang.CompilationDatabase.fromDirectory(DB_PATH)
+    return InternalState(db, time.time(), collectors.GlobalCollector(), {})
 
 
 def file_analysis(iface, scope):
     file_path   = scope.get_path()
     state       = iface.state
-    _find_includes(iface, scope.package, state.includes)
-    assert scope.package.id in state.includes
-    args = ["-I" + path for path in state.includes[scope.package.id]]
-    args.append("-x")
-    args.append("c++")
-    # args.append("-std=c++11")
-    unit = state.index.parse(file_path, args)
-    # check for problems
-    if unit.diagnostics:
-        for d in unit.diagnostics:
-            if d.severity >= clang.Diagnostic.Error:
-                print d
-    # traverse nodes
-    data = _ast_analysis(unit, file_path, scope.package, state)
-    # _report_results(iface, data)
+    for c in state.database.getCompileCommands(file_path) or []:
+        # print "[CLANG] Analysing", file_path
+        with cwd(os.path.join(DB_PATH, c.directory)):
+            args = ["-I" + STD_INCLUDES] + list(c.arguments)[1:]
+            index = clang.Index.create()
+            unit = index.parse(None, args)
+            # check for problems
+            if unit.diagnostics:
+                for d in unit.diagnostics:
+                    if d.severity >= clang.Diagnostic.Error:
+                        print "[CLANG]", d.spelling
+            # traverse nodes
+            data = _ast_analysis(unit, scope.package, state)
 
 
 def post_analysis(iface):
@@ -78,6 +83,21 @@ def post_analysis(iface):
     _export_param_csv(iface)
     _export_param_type_csv(iface)
     _export_other(iface)
+    print ""
+    print "TOTAL ADVERTISE", len(ADVERTISE)
+    print "RETURN TYPES", Counter(ADVERTISE)
+    print ""
+    print "TOTAL SUBSCRIBE", len(SUBSCRIBE)
+    print "RETURN TYPES", Counter(SUBSCRIBE)
+    print ""
+    print "COUNTED ADVERTISE", collectors.advertise_count
+    print "COUNTED SUBSCRIBE", collectors.subscribe_count
+    print "COUNTED PUB-SUB VARS", collectors.pubsub_var
+    print ""
+    print "PARSED", model.function_counter, "FUNCTIONS"
+    print "COLLECTED", collectors.collected_functions, "FUNCTIONS"
+    print ""
+    print "[CLANG] Analysis took", int(time.time() - iface.state.start), "seconds"
 
 
 
@@ -128,17 +148,18 @@ def _read_package_includes(iface, package, var_data):
 # Analyser
 ###############################################################################
 
-def _ast_analysis(unit, file_path, package, state):
+def _ast_analysis(unit, package, state):
+    allowed = set(f.get_path() for f in package.source_files)
     cursor = unit.cursor
     # we cannot reuse the same instance of global scope, or else we get stuff
     # from other files mixed in
     global_scope = CppGlobalScope()
     for node in cursor.get_children():
-        if node.location.file and node.location.file.name == file_path:
+        if node.location.file and node.location.file.name.startswith("/home/andre/catkin_ws"):
             global_scope.add_from_cursor(node)
-    if not package in state.pkg_metrics:
-        state.pkg_metrics[package] = collectors.GlobalCollector()
-    state.pkg_metrics[package].collect_from_global_scope(global_scope)
+    if not package.id in state.pkg_metrics:
+        state.pkg_metrics[package.id] = collectors.GlobalCollector()
+    state.pkg_metrics[package.id].collect_from_global_scope(global_scope)
     return state.metrics.collect_from_global_scope(global_scope)
 
 
@@ -415,6 +436,19 @@ def _export_other(iface):
 ###############################################################################
 # Testing and Helper Functions
 ###############################################################################
+
+class cwd:
+    """Run a block of code from a specified working directory"""
+    def __init__(self, path):
+        self.dir = path
+
+    def __enter__(self):
+        self.old_dir = os.getcwd()
+        os.chdir(self.dir)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        os.chdir(self.old_dir)
+
 
 def analysis(file_path, index):
     unit = index.parse(file_path, ["-I" + "/usr/lib/llvm-3.8/lib/clang/3.8.0/include",
