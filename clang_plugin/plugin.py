@@ -90,12 +90,12 @@ def post_analysis(iface):
     print "TOTAL SUBSCRIBE", len(SUBSCRIBE)
     print "RETURN TYPES", Counter(SUBSCRIBE)
     print ""
-    print "COUNTED ADVERTISE", collectors.advertise_count
-    print "COUNTED SUBSCRIBE", collectors.subscribe_count
+    print "COUNTED ADVERTISE", collectors.advertise_count/2
+    print "COUNTED SUBSCRIBE", collectors.subscribe_count/2
     print "COUNTED PUB-SUB VARS", collectors.pubsub_var
     print ""
-    print "PARSED", model.function_counter, "FUNCTIONS"
-    print "COLLECTED", collectors.collected_functions, "FUNCTIONS"
+    print "COLLECTED {}/{} FUNCTIONS".format(collectors.collected_functions/2,
+                                             model.function_counter)
     print ""
     print "[CLANG] Analysis took", int(time.time() - iface.state.start), "seconds"
 
@@ -160,7 +160,7 @@ def _ast_analysis(unit, package, state):
     if not package.id in state.pkg_metrics:
         state.pkg_metrics[package.id] = collectors.GlobalCollector()
     state.pkg_metrics[package.id].collect_from_global_scope(global_scope)
-    return state.metrics.collect_from_global_scope(global_scope)
+    return state.metrics.collect_from_global_scope(global_scope, store = True)
 
 
 def _report_results(iface, data):
@@ -430,6 +430,18 @@ def _export_other(iface):
         for row in iface.state.metrics.csv_other():
             out.writerow(row)
     iface.export_file("other.csv")
+    with open("pub_data.txt", "w") as datafile:
+        datafile.write(iface.state.metrics.str_pub_data())
+    iface.export_file("pub_data.txt")
+    with open("sub_data.txt", "w") as datafile:
+        datafile.write(iface.state.metrics.str_sub_data())
+    iface.export_file("sub_data.txt")
+    with open("rpc_data.txt", "w") as datafile:
+        datafile.write(iface.state.metrics.str_rpc_data())
+    iface.export_file("rpc_data.txt")
+    with open("other_data.txt", "w") as datafile:
+        datafile.write(iface.state.metrics.str_other_data())
+    iface.export_file("other_data.txt")
 
 
 

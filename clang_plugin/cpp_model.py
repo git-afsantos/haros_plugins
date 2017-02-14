@@ -89,6 +89,10 @@ class CppExpression(CppBasicEntity):
         self.name   = cursor.spelling
         self.result = cursor.type.spelling or "[type]"
 
+    @property
+    def variables(self):
+        return []
+
     def pretty_str(self, indent = 0):
         return (" " * indent) + self.name
 
@@ -122,6 +126,10 @@ class CppReference(CppExpression):
             child = next(cursor.get_children(), None)
             if child:
                 self.field_of = _parse(child, scope = self.scope)
+
+    @property
+    def variables(self):
+        return [self.name]
 
     def pretty_str(self, indent = 0):
         spaces = (" " * indent)
@@ -162,15 +170,15 @@ class CppOperator(CppExpression):
         if cursor.kind == clang.CursorKind.UNARY_OPERATOR:
             self.name       = CppOperator._parse_unary(cursor)
             arg             = next(cursor.get_children())
-            self.arguments  = (_parse(arg, scope = self.scope, lazy = True),)
+            self.arguments  = (_parse(arg, scope = self.scope),)
             self.is_unary   = True
             self.is_binary  = False
         else:
             self.name       = CppOperator._parse_binary(cursor)
             args            = list(cursor.get_children())
             assert len(args) >= 2
-            self.arguments  = (_parse(args[0], scope = self.scope, lazy = True),
-                               _parse(args[1], scope = self.scope, lazy = True))
+            self.arguments  = (_parse(args[0], scope = self.scope),
+                               _parse(args[1], scope = self.scope))
             self.is_unary   = False
             self.is_binary  = True
 
@@ -202,6 +210,14 @@ class CppOperator(CppExpression):
             if token in CppOperator._binary_tokens:
                 return token
         return "[op]"
+
+    @property
+    def variables(self):
+        vs = []
+        for a in self.arguments:
+            if isinstance(a, CppExpression):
+                vs.extend(a.variables)
+        return vs
 
     def pretty_str(self, indent = 0):
         indent = (" " * indent)
@@ -256,8 +272,8 @@ class CppFunctionCall(CppExpression):
             self._parse_non_arguments(children)
             if not args and self.is_constructor:
                 args = children
-            self.arguments = [_parse(arg, scope = self.scope, arguments = True,
-                                     lazy = True) for arg in args]
+            self.arguments = [_parse(arg, scope = self.scope, arguments = True) \
+                              for arg in args]
         else:
             child = next(cursor.get_children(), None)
             if child:
@@ -280,6 +296,14 @@ class CppFunctionCall(CppExpression):
                     template.append(cursor.spelling)
             if template:
                 self.template = "::".join(template)
+
+    @property
+    def variables(self):
+        vs = []
+        for a in self.arguments:
+            if isinstance(a, CppExpression):
+                vs.extend(a.variables)
+        return vs
 
     def simplify(self):
         i = 0
@@ -351,7 +375,7 @@ class CppControlFlow(CppBasicEntity):
     def _parse_if(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[0], scope = self, lazy = True)
+        condition = _parse(children[0], scope = self)
         body = CppBlock.from_cursor(children[1], scope = self)
         branches = [(condition, body)]
         if len(children) >= 3:
@@ -366,20 +390,21 @@ class CppControlFlow(CppBasicEntity):
         # switch is hard to parse, this is neither correct nor pretty
         children = list(cursor.get_children())
         assert len(children) >= 2
-        var = _parse(children[0], scope = self, lazy = True)
-        if not children[1].kind == clang.CursorKind.COMPOUND_STMT:
-            print "switch child is", children[1].kind
-            return []
+        var = _parse(children[0], scope = self)
+        if children[1].kind == clang.CursorKind.COMPOUND_STMT:
+            children = list(children[1].get_children())
+        else:
+            children = children[1:]
         branches = []
         condition = True
         body = None
-        for node in children[1].get_children():
+        for node in children:
             if node.kind == clang.CursorKind.CASE_STMT:
                 if body:
                     branches.append((condition, body))
                 statements = list(node.get_children())
                 body = CppBlock(self)
-                value = _parse(statements[0], scope = self, lazy = True)
+                value = _parse(statements[0], scope = self)
                 condition = CppOperator(self, "==", "bool", (var, value))
                 for statement in statements[1:]:
                     body.append_statement(_parse(statement, scope = body))
@@ -409,33 +434,33 @@ class CppControlFlow(CppBasicEntity):
             condition = True
         elif len(children) == 2:
             # condition + body
-            condition = _parse(children[0], scope = self, lazy = True)
+            condition = _parse(children[0], scope = self)
         elif len(children) >= 4:
             # var + condition + increment + body
-            condition = _parse(children[1], scope = self, lazy = True)
+            condition = _parse(children[1], scope = self)
             body.append_statement(_parse(children[2], scope = body))
             self.variables.append(_parse(children[0], scope = self))
         elif children[0].kind == clang.CursorKind.DECL_STMT:
             # var + condition + body
-            condition = _parse(children[1], scope = self, lazy = True)
+            condition = _parse(children[1], scope = self)
             self.variables.append(_parse(children[0], scope = self))
         else:
             # condition + increment + body
-            condition = _parse(children[0], scope = self, lazy = True)
+            condition = _parse(children[0], scope = self)
             body.append_statement(_parse(children[1], scope = body))
         return [(condition, body)]
 
     def _parse_while(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[0], scope = self, lazy = True)
+        condition = _parse(children[0], scope = self)
         body = CppBlock.from_cursor(children[1], scope = self)
         return [(condition, body)]
 
     def _parse_do(self, cursor):
         children = list(cursor.get_children())
         assert len(children) >= 2
-        condition = _parse(children[1], scope = self, lazy = True)
+        condition = _parse(children[1], scope = self)
         body = CppBlock.from_cursor(children[0], scope = self)
         return [(condition, body)]
 
@@ -507,7 +532,7 @@ class CppStatement(CppBasicEntity):
         if cursor.kind == clang.CursorKind.RETURN_STMT:
             self.name   = "return"
             expression  = next(cursor.get_children(), None)
-            self.value  = _parse(expression, scope = self.scope, lazy = True) \
+            self.value  = _parse(expression, scope = self.scope) \
                           if expression else None
         elif cursor.kind == clang.CursorKind.BREAK_STMT:
             self.name   = "break"
@@ -586,7 +611,7 @@ class CppVariable(CppBasicEntity):
         self.result = cursor.type.spelling
         children = list(cursor.get_children())
         if children and children[-1].kind != clang.CursorKind.TYPE_REF:
-            self.value = _parse(children[-1], scope = self.scope, lazy = True)
+            self.value = _parse(children[-1], scope = self.scope)
 
     def pretty_str(self, indent = 0):
         indent = " " * indent
@@ -652,7 +677,7 @@ class CppFunction(CppNamedEntity):
             elif c.kind == clang.CursorKind.MEMBER_REF:
                 # This is for constructors, we need the sibling
                 member = CppReference.from_cursor(c, scope = self)
-                value = _parse(next(children), scope = self, lazy = True)
+                value = _parse(next(children), scope = self)
                 result = member.result
                 assignment = CppOperator(self, "=", result, (member, value))
                 self.body.append_statement(assignment)
