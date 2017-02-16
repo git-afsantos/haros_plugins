@@ -8,7 +8,7 @@ from collections import namedtuple, Counter
 from clang_plugin.cpp_model import CppBlock, CppControlFlow, CppFunction, \
                                    CppFunctionCall, CppDefaultArgument, \
                                    CppGlobalScope, CppOperator, CppVariable, \
-                                   CppStatement, CppExpression
+                                   CppStatement, CppExpression, CppReference, LazyCppEntity
 
 ###############################################################################
 # Collectibles
@@ -30,7 +30,8 @@ SUB_TYPE_4 = "subscribe(SubscribeOptions)"
 SubscribeTuple = namedtuple("SubscribeTuple",
                             ["topic", "queue_size", "callback", "message_type",
                              "nesting", "variable", "function", "line",
-                             "overload", "transport_hints", "param_topic"])
+                             "overload", "transport_hints", "param_topic",
+                             "param_queue"])
 
 ADV_TYPE_1 = "advertise(string topic, uint32_t queue_size, bool latch)"
 ADV_TYPE_2 = "advertise(string topic, uint32_t queue_size, " \
@@ -41,7 +42,7 @@ ADV_TYPE_3 = "advertise(AdvertiseOptions)"
 AdvertiseTuple = namedtuple("AdvertiseTuple",
                             ["topic", "queue_size", "message_type",
                              "nesting", "variable", "function", "line",
-                             "overload", "latch", "param_topic"])
+                             "overload", "latch", "param_topic", "param_queue"])
 
 PublishTuple = namedtuple("PublishTuple",
                           ["variable", "nesting", "function", "line", "scope"])
@@ -80,13 +81,17 @@ ParamTuple = namedtuple("ParamTuple", ["param", "variable", "default",
 
 class SubscriberStatistics(object):
     def __init__(self):
-        self.hardcoded_topics   = 0
+        self.hardcoded_topics   = []
         self.reference_topics   = 0
         self.call_topics        = 0
         self.operator_topics    = 0
         self.param_topics       = 0
         self.hardcoded_queues   = []
         self.infinite_queues    = 0
+        self.reference_queues   = 0
+        self.call_queues        = 0
+        self.operator_queues    = 0
+        self.param_queues       = 0
         self.msg_to_queue       = {}
         self.nesting            = []
         self.global_topics      = 0
@@ -99,9 +104,13 @@ class SubscriberStatistics(object):
     def total_subscribers(self):
         return len(self.nesting)
 
+    @property
+    def repeating_topics(self):
+        return len(self.hardcoded_topics) - len(set(self.hardcoded_topics))
+
     def collect_subscribe(self, datum):
         if isinstance(datum.topic, basestring):
-            self.hardcoded_topics += 1
+            self.hardcoded_topics.append(datum.topic)
             if datum.topic.startswith("/"):
                 self.global_topics += 1
         elif isinstance(datum.topic, CppReference):
@@ -118,6 +127,14 @@ class SubscriberStatistics(object):
             if datum.queue_size == 0:
                 self.infinite_queues += 1
             self._collect_message(datum)
+        elif isinstance(datum.queue_size, CppReference):
+            self.reference_queues += 1
+        elif isinstance(datum.queue_size, CppOperator):
+            self.operator_queues += 1
+        elif isinstance(datum.queue_size, CppFunctionCall):
+            self.call_queues += 1
+        if datum.param_queue:
+            self.param_queues += 1
         if datum.transport_hints:
             self.transport_hints += 1
         if datum.overload == SUB_TYPE_1:
@@ -138,9 +155,12 @@ class SubscriberStatistics(object):
     _SUBSCRIBE_HEADERS = [
         "Subscribe Calls", "Hard-coded Topics", "Reference Topics",
         "Function Call Topics", "Operator Topics", "Param Topics",
-        "Global Topics",
+        "Global Topics", "Repeating Topics",
         "Use of TransportHints", "Function Callbacks", "Method Callbacks",
-        "Boost Function Callbacks", "Hard-coded Queue Sizes", "Infinite Queues",
+        "Boost Function Callbacks", "Hard-coded Queue Sizes",
+        "Reference Queue Sizes", "Function Call Queue Sizes",
+        "Operator Queue Sizes", "Param Queue Sizes",
+        "Infinite Queues",
         "Median Queue Size", "Min. Queue Size", "Max. Queue Size",
         "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting"
     ]
@@ -149,17 +169,22 @@ class SubscriberStatistics(object):
         rows = [SubscriberStatistics._SUBSCRIBE_HEADERS]
         if not self.total_subscribers:
             return rows
-        data = [self.total_subscribers, self.hardcoded_topics,
+        data = [self.total_subscribers, len(self.hardcoded_topics),
                 self.reference_topics, self.call_topics, self.operator_topics,
-                self.param_topics, self.global_topics, self.transport_hints,
+                self.param_topics, self.global_topics, self.repeating_topics,
+                self.transport_hints,
                 self.function_callbacks, self.method_callbacks,
                 self.boost_callbacks]
         if self.hardcoded_queues:
-            data.extend([len(self.hardcoded_queues), self.infinite_queues,
+            data.extend([len(self.hardcoded_queues), self.reference_queues,
+                         self.call_queues, self.operator_queues,
+                         self.param_queues, self.infinite_queues,
                          median(self.hardcoded_queues),
                          min(self.hardcoded_queues), max(self.hardcoded_queues)])
         else:
-            data.extend([0, 0, None, None, None])
+            data.extend([0, self.reference_queues,
+                         self.call_queues, self.operator_queues,
+                         self.param_queues, 0, None, None, None])
         if self.nesting:
             data.extend([median(self.nesting), min(self.nesting),
                          max(self.nesting)])
@@ -171,7 +196,7 @@ class SubscriberStatistics(object):
 
 class PublisherStatistics(object):
     def __init__(self):
-        self.hardcoded_topics   = 0
+        self.hardcoded_topics   = []
         self.reference_topics   = 0
         self.call_topics        = 0
         self.operator_topics    = 0
@@ -179,6 +204,10 @@ class PublisherStatistics(object):
         self.latching_topics    = 0
         self.hardcoded_queues   = []
         self.infinite_queues    = 0
+        self.reference_queues   = 0
+        self.call_queues        = 0
+        self.operator_queues    = 0
+        self.param_queues       = 0
         self.msg_to_queue       = {}
         self.advertise_nesting  = []
         self.publish_nesting    = []
@@ -189,9 +218,13 @@ class PublisherStatistics(object):
     def total_publishers(self):
         return len(self.advertise_nesting)
 
+    @property
+    def repeating_topics(self):
+        return len(self.hardcoded_topics) - len(set(self.hardcoded_topics))
+
     def collect_advertise(self, datum):
         if isinstance(datum.topic, basestring):
-            self.hardcoded_topics += 1
+            self.hardcoded_topics.append(datum.topic)
             if datum.topic.startswith("/"):
                 self.global_topics += 1
         elif isinstance(datum.topic, CppReference):
@@ -208,6 +241,14 @@ class PublisherStatistics(object):
             if datum.queue_size == 0:
                 self.infinite_queues += 1
             self._collect_message(datum)
+        elif isinstance(datum.queue_size, CppReference):
+            self.reference_queues += 1
+        elif isinstance(datum.queue_size, CppOperator):
+            self.operator_queues += 1
+        elif isinstance(datum.queue_size, CppFunctionCall):
+            self.call_queues += 1
+        if datum.param_queue:
+            self.param_queues += 1
         if datum.latch:
             self.latching_topics += 1
         if datum.overload == ADV_TYPE_2:
@@ -227,9 +268,12 @@ class PublisherStatistics(object):
     _PUBLISH_HEADERS = [
         "Advertise Calls", "Hard-coded Topics", "Reference Topics",
         "Function Call Topics", "Operator Topics", "Param Topics",
-        "Global Topics",
+        "Global Topics", "Repeating Topics",
         "Latching Publishers", "Use of SubscriberStatus",
-        "Hard-coded Queue Sizes", "Infinite Queues", "Median Queue Size",
+        "Hard-coded Queue Sizes", "Reference Queue Sizes",
+        "Function Call Queue Sizes",
+        "Operator Queue Sizes", "Param Queue Sizes",
+        "Infinite Queues", "Median Queue Size",
         "Min. Queue Size", "Max. Queue Size",
         "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting",
         "Publish Calls", "Median Control Nesting",
@@ -238,16 +282,20 @@ class PublisherStatistics(object):
 
     def csv_publish(self):
         rows = [PublisherStatistics._PUBLISH_HEADERS]
-        data = [self.total_publishers, self.hardcoded_topics,
+        data = [self.total_publishers, len(self.hardcoded_topics),
                 self.reference_topics, self.call_topics, self.operator_topics,
-                self.param_topics, self.global_topics,
+                self.param_topics, self.global_topics, self.repeating_topics,
                 self.latching_topics, self.subscriber_status]
         if self.hardcoded_queues:
-            data.extend([len(self.hardcoded_queues), self.infinite_queues,
+            data.extend([len(self.hardcoded_queues), self.reference_queues,
+                         self.call_queues, self.operator_queues,
+                         self.param_queues, self.infinite_queues,
                          median(self.hardcoded_queues),
                          min(self.hardcoded_queues), max(self.hardcoded_queues)])
         else:
-            data.extend([0, 0, None, None, None])
+            data.extend([0, self.reference_queues,
+                         self.call_queues, self.operator_queues,
+                         self.param_queues, 0, None, None, None])
         if self.advertise_nesting:
             data.extend([median(self.advertise_nesting),
                          min(self.advertise_nesting), max(self.advertise_nesting)])
@@ -264,7 +312,8 @@ class PublisherStatistics(object):
 
 class RpcStatistics(object):
     def __init__(self):
-        self.hardcoded_topics   = 0
+        self.hardcoded_servers  = []
+        self.hardcoded_clients  = []
         self.reference_topics   = 0
         self.call_topics        = 0
         self.operator_topics    = 0
@@ -280,9 +329,25 @@ class RpcStatistics(object):
     def total_rpc(self):
         return len(self.server_nesting) + len(self.client_nesting)
 
+    @property
+    def repeating_servers(self):
+        return len(self.hardcoded_servers) - len(set(self.hardcoded_servers))
+
+    @property
+    def repeating_clients(self):
+        return len(self.hardcoded_clients) - len(set(self.hardcoded_clients))
+
+    @property
+    def open_services(self):
+        return len(set(self.hardcoded_servers) ^ set(self.hardcoded_clients))
+
+    @property
+    def hardcoded_topics(self):
+        return len(self.hardcoded_servers) + len(self.hardcoded_clients)
+
     def collect_server(self, datum):
         if isinstance(datum.topic, basestring):
-            self.hardcoded_topics += 1
+            self.hardcoded_servers.append(datum.topic)
             if datum.topic.startswith("/"):
                 self.global_topics += 1
         elif isinstance(datum.topic, CppReference):
@@ -303,7 +368,7 @@ class RpcStatistics(object):
 
     def collect_client(self, datum):
         if isinstance(datum.topic, basestring):
-            self.hardcoded_topics += 1
+            self.hardcoded_clients.append(datum.topic)
             if datum.topic.startswith("/"):
                 self.global_topics += 1
         self.client_nesting.append(datum.nesting)
@@ -312,12 +377,12 @@ class RpcStatistics(object):
     _RPC_HEADERS = [
         "Total Services", "Hard-coded Services", "Reference Services",
         "Function Call Services", "Operator Services", "Param Services",
-        "Global Services",
-        "Service Servers", "Function Callbacks", "Method Callbacks",
+        "Global Services", "Service Servers", "Repeating Servers",
+        "Function Callbacks", "Method Callbacks",
         "Boost Function Callbacks", "Median Control Nesting",
         "Min. Control Nesting", "Max. Control Nesting",
-        "Service Clients", "Median Control Nesting",
-        "Min. Control Nesting", "Max. Control Nesting"
+        "Service Clients", "Repeating Clients", "Median Control Nesting",
+        "Min. Control Nesting", "Max. Control Nesting", "Open Services"
     ]
 
     def csv_service(self):
@@ -326,7 +391,8 @@ class RpcStatistics(object):
             data = [self.total_rpc, self.hardcoded_topics,
                     self.reference_topics, self.call_topics,
                     self.operator_topics, self.param_topics, self.global_topics,
-                    len(self.server_nesting), self.function_callbacks,
+                    len(self.server_nesting), self.repeating_servers,
+                    self.function_callbacks,
                     self.method_callbacks, self.boost_callbacks
             ]
             if self.server_nesting:
@@ -335,11 +401,12 @@ class RpcStatistics(object):
             else:
                 data.extend([None, None, None])
             if self.client_nesting:
-                data.extend([len(self.client_nesting),
+                data.extend([len(self.client_nesting), self.repeating_clients,
                         median(self.client_nesting),
-                        min(self.client_nesting), max(self.client_nesting)])
+                        min(self.client_nesting), max(self.client_nesting),
+                        self.open_services])
             else:
-                data.extend([0, None, None, None])
+                data.extend([0, None, None, None, self.open_services])
             rows.append(data)
         return rows
 
@@ -351,6 +418,7 @@ class ParamStatistics(object):
         self.global_params      = 0
         self.defaults           = 0
         self.param_type         = Counter()
+        self.modified_params    = 0
 
     def collect_param(self, datum):
         self.total_params += 1
@@ -363,17 +431,20 @@ class ParamStatistics(object):
         if datum.param_type:
             self.param_type[datum.param_type] += 1
 
+    def add_modified_params(self, data):
+        self.modified_params += len(data)
+
     _PARAM_HEADERS = [
-        "Total Parameters", "Hard-coded Parameters",
-        "Global Parameters", "Uses Default Value"
+        "Total Read Parameters", "Hard-coded Parameters",
+        "Global Parameters", "Uses Default Value",
+        "Total Modified Parameters"
     ]
 
     def csv_param(self):
         rows = [ParamStatistics._PARAM_HEADERS]
-        if self.total_params:
-            rows.append([self.total_params, self.hardcoded_params,
-                self.global_params, self.defaults
-            ])
+        rows.append([self.total_params, self.hardcoded_params,
+            self.global_params, self.defaults, self.modified_params
+        ])
         return rows
 
     _TYPE_HEADERS = ["Parameter Type", "Count"]
@@ -761,6 +832,10 @@ class GlobalCollector(object):
     def boost_callbacks(self):
         return self.sub.boost_callbacks + self.rpc.boost_callbacks
 
+    @property
+    def open_topics(self):
+        return len(set(self.pub.hardcoded_topics) ^ set(self.sub.hardcoded_topics))
+
     def collect(self, function_collector, store = False):
         for datum in function_collector.subscribe:
             self.sub.collect_subscribe(datum)
@@ -818,15 +893,15 @@ class GlobalCollector(object):
         return rows
 
     _OTHER_HEADERS = [
-        "Spin Rates", "Hard-coded Spin Rates", "Median Spin Rate",
-        "Min. Spin Rate", "Max. Spin Rate", "Median Function Calls",
-        "Min. Function Calls", "Max. Function Calls", "Median Unique Calls",
-        "Min. Unique Calls", "Max. Unique Calls"
+        "Open Topics", "Spin Rates", "Hard-coded Spin Rates",
+        "Median Spin Rate", "Min. Spin Rate", "Max. Spin Rate",
+        "Median Function Calls", "Min. Function Calls", "Max. Function Calls",
+        "Median Unique Calls", "Min. Unique Calls", "Max. Unique Calls"
     ]
 
     def csv_other(self):
         rows = [GlobalCollector._OTHER_HEADERS]
-        data = [self.total_rates]
+        data = [self.open_topics, self.total_rates]
         if self.hardcoded_rates:
             data.extend([len(self.hardcoded_rates), median(self.hardcoded_rates),
                          min(self.hardcoded_rates), max(self.hardcoded_rates)])
@@ -983,12 +1058,15 @@ class FunctionCollector(object):
         self.sleep              = []
         self.ros_parameters     = []
         self.param_vars         = set()
+        self.modified_params    = set()
         self.function_set       = set()
         self.function_calls     = 0
         for statement in function.body.body:
             self._collect(statement)
 
     def _collect(self, statement, nesting = 0, variable = None):
+        if isinstance(statement, LazyCppEntity):
+            statement = statement.evaluate()
         if isinstance(statement, CppVariable):
             self._from_variable(statement, nesting)
         elif isinstance(statement, CppFunctionCall):
@@ -1066,6 +1144,9 @@ class FunctionCollector(object):
             self._param_call(call, nesting, variable = variable)
         elif name == "getParam" or name == "getParamCached":
             self._get_param_call(call, nesting, variable = variable)
+        elif name == "deleteParam" or name == "setParam":
+            if call.arguments and isinstance(call.arguments[0], basestring):
+                self.modified_params.add(call.arguments[0])
         else:
             for arg in call.arguments:
                 self._collect(arg)
@@ -1076,7 +1157,8 @@ class FunctionCollector(object):
         topic       = None
         queue_size  = None
         latch       = False
-        var         = ()
+        tvar        = ()
+        qvar        = ()
         if nargs == 1:
             atype = ADV_TYPE_3
         else:
@@ -1087,10 +1169,13 @@ class FunctionCollector(object):
             latch       = call.arguments[-1]
             latch       = latch if isinstance(latch, bool) else None
             if isinstance(topic, CppExpression):
-                var     = topic.variables
+                tvar    = topic.variables
+            if isinstance(queue_size, CppExpression):
+                qvar    = queue_size.variables
         self.advertise.append(AdvertiseTuple(topic, queue_size,
                 call.template, nesting, variable, self.function, call.line,
-                atype, latch, any(v in self.param_vars for v in var)))
+                atype, latch, any(v in self.param_vars for v in tvar),
+                any(v in self.param_vars for v in qvar)))
 
     def _subscribe_call(self, call, nesting, variable = None):
         nargs = len(call.arguments)
@@ -1099,7 +1184,8 @@ class FunctionCollector(object):
         callback    = None
         msg_type    = None
         hints       = False
-        var         = ()
+        tvar        = ()
+        qvar        = ()
         if nargs == 1:
             # assert call.arguments[0].result == "ros::SubscribeOptions"
             stype = SUB_TYPE_4
@@ -1123,10 +1209,14 @@ class FunctionCollector(object):
                     stype = SUB_TYPE_1
             hints = not isinstance(call.arguments[-1], CppDefaultArgument)
             if isinstance(topic, CppExpression):
-                var = topic.variables
+                tvar = topic.variables
+            if isinstance(queue_size, CppExpression):
+                qvar = queue_size.variables
         self.subscribe.append(SubscribeTuple(topic, queue_size, callback,
                 msg_type, nesting, variable, self.function,
-                call.line, stype, hints, any(v in self.param_vars for v in var)))
+                call.line, stype, hints,
+                any(v in self.param_vars for v in tvar),
+                any(v in self.param_vars for v in qvar)))
 
     def _advertise_service_call(self, call, nesting, variable = None):
         nargs = len(call.arguments)

@@ -56,9 +56,23 @@ class LazyCppEntity(object):
     def __init__(self, scope, cursor):
         self.scope  = scope
         self.cursor = cursor
+        self._actual = None
+
+    @property
+    def name(self):
+        if not self._actual:
+            self._actual = self.evaluate()
+        return self._actual.name
+
+    @property
+    def result(self):
+        if not self._actual:
+            self._actual = self.evaluate()
+        return self._actual.result
 
     def evaluate(self):
-        return _parse(self.cursor, scope = self.scope, lazy = False)
+        self._actual = _parse(self.cursor, scope = self.scope, lazy = False)
+        return self._actual
 
     def pretty_str(self, indent = 0):
         return (" " * indent) + self.__str__()
@@ -176,11 +190,16 @@ class CppOperator(CppExpression):
         else:
             self.name       = CppOperator._parse_binary(cursor)
             args            = list(cursor.get_children())
-            assert len(args) >= 2
-            self.arguments  = (_parse(args[0], scope = self.scope),
-                               _parse(args[1], scope = self.scope))
-            self.is_unary   = False
-            self.is_binary  = True
+            if len(args) >= 2:
+                self.arguments  = (_parse(args[0], scope = self.scope),
+                                   _parse(args[1], scope = self.scope))
+                self.is_unary   = False
+                self.is_binary  = True
+            else:
+                print "[CLANG] binary op with less than two args", self.name
+                self.arguments = ()
+                self.is_unary   = False
+                self.is_binary  = False
 
     @staticmethod
     def _parse_unary(cursor):
@@ -192,9 +211,11 @@ class CppOperator(CppExpression):
             if token[0].isalpha():
                 # The last token seems to be what ends the expression, e.g. ';'
                 token = tokens[-2].spelling
-                assert not token[0].isalpha()
-                if token == "++" or token == "--":
-                    return "_" + token
+                if not token[0].isalpha():
+                    if token == "++" or token == "--":
+                        return "_" + token
+                else:
+                    print "[CLANG] unknown unary operator", [t.spelling for t in tokens]
             elif token in CppOperator._unary_tokens:
                 return token
         return "[op]"
@@ -204,7 +225,11 @@ class CppOperator(CppExpression):
         # There are no alpha operators
         # I think "->" and "->*" might have their own CursorKind
         # All operators seem to be infix; get the last token of the first child
-        tokens = list(next(cursor.get_children()).get_tokens())
+        child = next(cursor.get_children(), None)
+        if not child:
+            print "[CLANG] binary op without child", cursor.spelling
+            return "[op]"
+        tokens = list(child.get_tokens())
         if tokens:
             token = tokens[-1].spelling
             if token in CppOperator._binary_tokens:

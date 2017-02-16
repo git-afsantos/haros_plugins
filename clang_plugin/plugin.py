@@ -20,6 +20,7 @@
 from collections import namedtuple, Counter
 import csv
 import os
+import sys
 import time
 
 ###
@@ -52,6 +53,7 @@ InternalState = namedtuple("InternalState",
 ###############################################################################
 
 def pre_analysis():
+    sys.setrecursionlimit(2000)
     clang.Config.set_library_path(LIB_PATH)
     db = clang.CompilationDatabase.fromDirectory(DB_PATH)
     return InternalState(db, time.time(), collectors.GlobalCollector(), {})
@@ -72,6 +74,7 @@ def file_analysis(iface, scope):
                     if d.severity >= clang.Diagnostic.Error:
                         print "[CLANG]", d.spelling
             # traverse nodes
+            print "[CLANG] analysing", file_path
             data = _ast_analysis(unit, scope.package, state)
 
 
