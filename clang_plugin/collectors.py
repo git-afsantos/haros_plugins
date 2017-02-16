@@ -68,7 +68,8 @@ ServiceClientTuple = namedtuple("ServiceClientTuple",
                                  "param_topic"])
 
 SpinRateTuple = namedtuple("SpinRateTuple",
-                           ["rate", "variable", "function", "line"])
+                           ["rate", "variable", "function", "line",
+                            "param_rate"])
 
 ParamTuple = namedtuple("ParamTuple", ["param", "variable", "default",
                                        "param_type", "function", "line"])
@@ -800,6 +801,10 @@ class GlobalCollector(object):
         self.param              = ParamStatistics()
         self.total_rates        = 0
         self.hardcoded_rates    = []
+        self.reference_rates    = 0
+        self.call_rates         = 0
+        self.operator_rates     = 0
+        self.param_rates        = 0
         self.function_calls     = []
         self.distinct_calls     = []
         self.pub_data           = []
@@ -859,6 +864,14 @@ class GlobalCollector(object):
             self.total_rates += 1
             if isinstance(datum.rate, (int, long)):
                 self.hardcoded_rates.append(datum.rate)
+            elif isinstance(datum.rate, CppReference):
+                self.reference_rates += 1
+            elif isinstance(datum.rate, CppOperator):
+                self.operator_rates += 1
+            elif isinstance(datum.rate, CppFunctionCall):
+                self.call_rates += 1
+            if datum.param_rate:
+                self.param_rates += 1
             if store: self.other_data.append(datum)
         self.function_calls.append(function_collector.function_calls)
         self.distinct_calls.append(len(function_collector.function_set))
@@ -894,6 +907,8 @@ class GlobalCollector(object):
 
     _OTHER_HEADERS = [
         "Open Topics", "Spin Rates", "Hard-coded Spin Rates",
+        "Reference Spin Rates", "Function Call Spin Rates",
+        "Operator Spin Rates", "Param Spin Rates",
         "Median Spin Rate", "Min. Spin Rate", "Max. Spin Rate",
         "Median Function Calls", "Min. Function Calls", "Max. Function Calls",
         "Median Unique Calls", "Min. Unique Calls", "Max. Unique Calls"
@@ -903,10 +918,15 @@ class GlobalCollector(object):
         rows = [GlobalCollector._OTHER_HEADERS]
         data = [self.open_topics, self.total_rates]
         if self.hardcoded_rates:
-            data.extend([len(self.hardcoded_rates), median(self.hardcoded_rates),
+            data.extend([len(self.hardcoded_rates), self.reference_rates,
+                         self.call_rates, self.operator_rates,
+                         self.param_rates,
+                         median(self.hardcoded_rates),
                          min(self.hardcoded_rates), max(self.hardcoded_rates)])
         else:
-            data.extend([0, None, None, None])
+            data.extend([0, self.reference_rates,
+                         self.call_rates, self.operator_rates,
+                         self.param_rates, None, None, None])
         if self.function_calls:
             data.extend([median(self.function_calls), min(self.function_calls),
                          max(self.function_calls), median(self.distinct_calls),
@@ -1093,9 +1113,13 @@ class FunctionCollector(object):
         if variable.result == "ros::Rate":
             if isinstance(variable.value, CppFunctionCall):
                 value = None
+                svar = ()
                 if len(variable.value.arguments) > 0:
                     value = variable.value.arguments[0]
-                o = SpinRateTuple(value, name, self.function, variable.line)
+                if isinstance(value, CppExpression):
+                    svar = value.variables
+                o = SpinRateTuple(value, name, self.function, variable.line,
+                                  any(v in self.param_vars for v in svar))
                 self.spin_rate.append(o)
         elif variable.result == "ros::Publisher" \
                 or variable.result == "ros::Subscriber" \
