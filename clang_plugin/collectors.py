@@ -875,6 +875,7 @@ class GlobalCollector(object):
             if store: self.other_data.append(datum)
         self.function_calls.append(function_collector.function_calls)
         self.distinct_calls.append(len(function_collector.function_set))
+        self.param.modified_params += function_collector.set_param_count
 
     def collect_from_global_scope(self, global_scope, store = False):
         assert isinstance(global_scope, CppGlobalScope)
@@ -1079,6 +1080,7 @@ class FunctionCollector(object):
         self.ros_parameters     = []
         self.param_vars         = set()
         self.modified_params    = set()
+        self.set_param_count    = 0
         self.function_set       = set()
         self.function_calls     = 0
         for statement in function.body.body:
@@ -1169,6 +1171,7 @@ class FunctionCollector(object):
         elif name == "getParam" or name == "getParamCached":
             self._get_param_call(call, nesting, variable = variable)
         elif name == "deleteParam" or name == "setParam":
+            self.set_param_count += 1
             if call.arguments and isinstance(call.arguments[0], basestring):
                 self.modified_params.add(call.arguments[0])
         else:
