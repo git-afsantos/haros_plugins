@@ -915,7 +915,10 @@ CppGlobalScope.INSTANCE = CppGlobalScope()
 def _parse(cursor, **options):
     scope = options.get("scope", CppGlobalScope.INSTANCE)
     if cursor.kind == clang.CursorKind.STRING_LITERAL:
-        return cursor.spelling
+        token = cursor.spelling
+        if token.startswith('"'):
+            token = token[1:-1]
+        return token
     if cursor.kind == clang.CursorKind.INTEGER_LITERAL:
         token = next(cursor.get_tokens(), None)
         if token:
@@ -1011,7 +1014,10 @@ def _parse_basic_string(cursor, scope = None):
         if not child:
             return None
         if child.kind == clang.CursorKind.STRING_LITERAL:
-            return child.spelling
+            token = child.spelling
+            if token.startswith('"'):
+                token = token[1:-1]
+            return token
         return CppFunctionCall.from_cursor(cursor, scope = scope)
     return None
 
