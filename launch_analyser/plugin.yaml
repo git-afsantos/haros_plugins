@@ -1,0 +1,7 @@
+%YAML 1.1
+---
+name: launch_analyser
+version: 0.1
+languages:
+    - launch
+metrics: []
