@@ -588,7 +588,16 @@ def package_analysis(iface, package):
             analyser.analyse(launch_file)
 
             if not launch_file in iface.state.fstats:
-                iface.state.fstats[launch_file] = analyser.top_launch.stats
+                stats = analyser.top_launch.stats
+                iface.state.fstats[launch_file] = stats
+                for ref in analyser.top_launch.unknown:
+                    if ref[0] == "env":
+                        stats.n_unk_env += 1
+                    elif ref[0] == "arg":
+                        stats.n_unk_args += 1
+                    elif ref[0] == "pkg":
+                        stats.unk_pkgs.add(ref[1])
+                        print "[LAUNCH] unknown package", ref[1]
 
             launches = analyser.top_launch.includes
             while launches:
@@ -598,16 +607,22 @@ def package_analysis(iface, package):
                 del launches[0]
 
 def post_analysis(iface):
+    depends = {}
     rows = [Stats._CSV_HEADERS]
     for lf, stats in iface.state.fstats.iteritems():
         if stats:
             iface.state.gstats.merge(stats)
             rows.append(stats.to_csv())
+            depends[lf] = stats.all_pkg_depends
     with open("launch_stats.csv", "w") as csvfile:
         out = csv.writer(csvfile)
         for row in rows:
             out.writerow(row)
     iface.export_file("launch_stats.csv")
+    with open("launch_pkg_depends.txt", "w") as f:
+        for lf, deps in depends.iteritems():
+            f.write(lf + ";" + ";".join(deps) + "\n")
+    iface.export_file("launch_pkg_depends.txt")
     print "[LAUNCH] considered", len(iface.state.fstats), "launch files"
 
 
@@ -639,6 +654,7 @@ class Stats(object):
         self.n_unk_env      = 0
         self.pkgs           = set()
         self.cond_pkgs      = set()
+        self.unk_pkgs       = set()
         self.n_remaps       = 0
         self.n_pass_args    = 0
         self.n_env          = 0
@@ -653,6 +669,10 @@ class Stats(object):
     @property
     def n_cond_packages(self):
         return len(self.cond_pkgs)
+
+    @property
+    def all_pkg_depends(self):
+        return self.pkgs | self.cond_pkgs
 
     def merge(self, other):
         self.n_args += other.n_args
@@ -677,6 +697,7 @@ class Stats(object):
         self.n_unk_env += other.n_unk_env
         self.pkgs.update(other.pkgs)
         self.cond_pkgs.update(other.cond_pkgs)
+        self.unk_pkgs.update(other.unk_pkgs)
         self.n_remaps += other.n_remaps
         self.n_pass_args += other.n_pass_args
         self.n_env += other.n_env
