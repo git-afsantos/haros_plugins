@@ -259,7 +259,7 @@ class LaunchFileAnalyser(object):
         self._scope = None
 
     _ALL_TAGS = ("node", "machine", "include", "remap", "env", "param",
-                 "rosparam", "group", "test", "arg")
+                 "rosparam", "group", "test", "arg", "master")
 
     def analyse(self, launch_file, args = None, ns = "/"):
         if launch_file in self.visited_files:
