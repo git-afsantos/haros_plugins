@@ -619,6 +619,7 @@ def post_analysis(iface):
             iface.state.gstats.merge(stats)
             rows.append(stats.to_csv())
             depends[lf] = stats.all_pkg_depends
+    rows.append(iface.state.gstats.to_csv())
     with open("launch_stats.csv", "w") as csvfile:
         out = csv.writer(csvfile)
         for row in rows:
