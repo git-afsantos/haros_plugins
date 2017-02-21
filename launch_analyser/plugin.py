@@ -481,6 +481,8 @@ class LaunchScope(object):
             self.launch.unknown.append(("pkg", pkg))
         else:
             value = value.path
+            self.launch.stats.pkgs.add(pkg)
+            self.launch.stats.pkgs.update(_pkg_transitive(pkg, self.resource_finder))
         return value
 
     def get_env(self, var, default = None):
@@ -581,6 +583,22 @@ class LaunchScope(object):
         return _resolve_non_private_name(ns, self.namespace)
 
 
+def _pkg_transitive(pkg, finder):
+    deps = []
+    visited = set()
+    q = [pkg]
+    while q:
+        visited.add(q[0])
+        p = finder.find_package(q[0])
+        if p:
+            for o in p.dependencies:
+                if not o in visited:
+                    deps.append(o)
+                    q.append(o)
+        del q[0]
+    return deps
+
+
 ###############################################################################
 # HAROS plugin
 ###############################################################################
@@ -641,10 +659,14 @@ def post_analysis(iface):
         for row in rows:
             out.writerow(row)
     iface.export_file("launch_stats.csv")
-    with open("launch_pkg_depends.txt", "w") as f:
+    with open("launch_pkg_depends.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
         for lf, deps in depends.iteritems():
-            f.write(lf + ";" + ";".join(deps) + "\n")
-    iface.export_file("launch_pkg_depends.txt")
+            out.writerow([lf] + list(deps))
+    iface.export_file("launch_pkg_depends.csv")
+    with open("n_launch.txt", "w") as f:
+        f.write(str(n))
+    iface.export_file("n_launch.txt")
     print "[LAUNCH] considered", n, "launch files"
 
 
