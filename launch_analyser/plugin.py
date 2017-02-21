@@ -603,8 +603,7 @@ def package_analysis(iface, package):
                         stats.n_unk_args += 1
                     elif ref[0] == "pkg":
                         stats.unk_pkgs.add(ref[1])
-                        print "[LAUNCH] unknown package", ref[1]
-            launches = analyser.top_launch.includes
+            launches = list(analyser.top_launch.includes)
             while launches:
                 launch = launches[0]
                 iface.state.fstats[launch.name] = None
