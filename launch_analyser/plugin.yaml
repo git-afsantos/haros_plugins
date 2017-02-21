@@ -4,4 +4,4 @@ name: launch_analyser
 version: 0.1
 languages:
     - launch
-metrics: []
+metrics: {}
