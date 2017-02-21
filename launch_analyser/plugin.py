@@ -726,5 +726,5 @@ class Stats(object):
                 self.n_respawn, self.n_node_machines, self.n_argv,
                 self.n_machines, self.n_test, len(self.pkgs), len(self.cond_pkgs),
                 self.n_remaps, self.n_if, self.n_includes, self.n_repeat_includes,
-                self.n_unk_includes, self.n_pass_args, self.n_env, self.unknown,
+                self.n_unk_includes, self.n_pass_args, self.n_env, self.n_unknown,
                 self.n_unk_args, self.n_unk_env]
