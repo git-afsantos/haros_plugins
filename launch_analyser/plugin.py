@@ -374,6 +374,7 @@ class LaunchFileAnalyser(object):
         scope = self._scope
         launch = self.analyse(launch_file, args = args, ns = ns)
         scope.launch.includes.append(launch)
+        scope.launch.stats.merge(launch.stats)
         self._scope = scope
         self._scope.launch.stats.n_includes += 1
 
