@@ -129,6 +129,7 @@ class LaunchFile(object):
         self.nodes = []             # all evaluated <node>
         self.includes = []          # all evaluated <include>
         self.unknown = []           # unknown references
+        self.valid = True
 
         self.stats = Stats(name)
 
@@ -281,9 +282,10 @@ class LaunchFileAnalyser(object):
                 for tag in xml_root:
                     self._analyse_tag(tag)
             except (ET.ParseError, InvalidTagError, InvalidAttributeError) as e:
-                pass
+                launch.valid = False
         else:
             self.top_launch.stats.n_unk_includes += 1
+            launch.valid = False
         return launch
 
     def _analyse_tag(self, tag):
@@ -340,6 +342,10 @@ class LaunchFileAnalyser(object):
                 raise InvalidTagError(name)
         self._scope = self._scope.scope
 
+        if pkg == "nodelet":
+            if argv.startswith("load "):
+                ss = argv.split()[1].split("/")[0]
+                self._scope.launch.stats.pkgs.add(ss)
         if attrib.get("machine"):
             self._scope.launch.stats.n_node_machines += 1
         if attrib.get("required"):
@@ -583,6 +589,7 @@ class InternalState(object):
     def __init__(self):
         self.gstats = Stats("global")
         self.fstats = {}
+        self.unknown_packages = set()
 
 def pre_analysis():
     return InternalState()
@@ -591,7 +598,7 @@ def package_analysis(iface, package):
     for sf in package.source_files:
         if sf.language == "launch":
             launch_file = sf.get_path()
-            env = {}
+            env = dict(os.environ)
             analyser = LaunchFileAnalyser(env, iface)
             analyser.analyse(launch_file)
             if not launch_file in iface.state.fstats:
@@ -604,19 +611,27 @@ def package_analysis(iface, package):
                         stats.n_unk_args += 1
                     elif ref[0] == "pkg":
                         stats.unk_pkgs.add(ref[1])
-            launches = list(analyser.top_launch.includes)
+                        iface.state.unknown_packages.add(ref[1])
+            top = analyser.top_launch
+            launches = list(top.includes)
             while launches:
                 launch = launches[0]
+                top.valid = top.valid and launch.valid
                 iface.state.fstats[launch.name] = None
                 launches.extend(launch.includes)
                 del launches[0]
+            if top.stats.unk_pkgs or not top.valid:
+                iface.state.fstats[launch_file] = None
+
 
 def post_analysis(iface):
-    print "[LAUNCH] POST ANALYSIS"
+    print "[LAUNCH] unknown packages", iface.state.unknown_packages
     depends = {}
     rows = [Stats._CSV_HEADERS]
+    n = 0
     for lf, stats in iface.state.fstats.iteritems():
         if stats:
+            n += 1
             iface.state.gstats.merge(stats)
             rows.append(stats.to_csv())
             depends[lf] = stats.all_pkg_depends
@@ -630,7 +645,7 @@ def post_analysis(iface):
         for lf, deps in depends.iteritems():
             f.write(lf + ";" + ";".join(deps) + "\n")
     iface.export_file("launch_pkg_depends.txt")
-    print "[LAUNCH] considered", len(iface.state.fstats), "launch files"
+    print "[LAUNCH] considered", n, "launch files"
 
 
 
