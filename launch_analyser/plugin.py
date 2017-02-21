@@ -20,11 +20,12 @@ def _resolve_base_name(name, ns = "/"):
     return ns + name
 
 def _resolve_non_private_name(name, ns = "/"):
-    assert name[0].isalpha() or name[0] == "/"
-    if name[0] == "/":
-        return name
-    if ns != "/":
-        return ns + "/" + name
+    # assert name[0].isalpha() or name[0] == "/"
+    if name[0].isalpha() or name[0] == "/":
+        if name[0] == "/":
+            return name
+        if ns != "/":
+            return ns + "/" + name
     return ns + name
     
 
@@ -264,19 +265,23 @@ class LaunchFileAnalyser(object):
     def analyse(self, launch_file, args = None, ns = "/"):
         if launch_file in self.visited_files:
             # TODO detect cycles but allow multiple inclusions
-            print "WARNING:", launch_file, "is included multiple times"
+            #print "WARNING:", launch_file, "is included multiple times"
             # return self.visited_files[launch_file]
+            pass
         launch = LaunchFile(launch_file, args = args, ns = ns)
         self._scope = self._base_scope.child_scope(ns = ns)
         self._scope.launch = launch
         self.visited_files[launch_file] = launch
         self.top_launch = self.top_launch or launch
         if os.path.isfile(launch_file):
-            xml_root = ET.parse(launch_file).getroot()
-            if not xml_root.tag == "launch":
-                raise InvalidTagError(xml_root.tag)
-            for tag in xml_root:
-                self._analyse_tag(tag)
+            try:
+                xml_root = ET.parse(launch_file).getroot()
+                if not xml_root.tag == "launch":
+                    raise InvalidTagError(xml_root.tag)
+                for tag in xml_root:
+                    self._analyse_tag(tag)
+            except (ET.ParseError, InvalidTagError, InvalidAttributeError) as e:
+                pass
         else:
             self.top_launch.stats.n_unk_includes += 1
         return launch
@@ -349,6 +354,8 @@ class LaunchFileAnalyser(object):
     def _include_tag(self, tag):
         attrib = self._attributes(tag.attrib, LaunchFileAnalyser._INCLUDE_ATTRS)
         launch_file = attrib["file"]
+        if launch_file == UNKNOWN:
+            return
         ns = attrib.get("ns")
         ns = _resolve_non_private_name(ns, self._scope.namespace) \
                 if ns else self._scope.namespace
@@ -586,7 +593,6 @@ def package_analysis(iface, package):
             env = {}
             analyser = LaunchFileAnalyser(env, iface)
             analyser.analyse(launch_file)
-
             if not launch_file in iface.state.fstats:
                 stats = analyser.top_launch.stats
                 iface.state.fstats[launch_file] = stats
@@ -598,7 +604,6 @@ def package_analysis(iface, package):
                     elif ref[0] == "pkg":
                         stats.unk_pkgs.add(ref[1])
                         print "[LAUNCH] unknown package", ref[1]
-
             launches = analyser.top_launch.includes
             while launches:
                 launch = launches[0]
@@ -607,6 +612,7 @@ def package_analysis(iface, package):
                 del launches[0]
 
 def post_analysis(iface):
+    print "[LAUNCH] POST ANALYSIS"
     depends = {}
     rows = [Stats._CSV_HEADERS]
     for lf, stats in iface.state.fstats.iteritems():
