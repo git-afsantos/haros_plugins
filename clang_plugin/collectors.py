@@ -470,7 +470,7 @@ class StatValues(object):
         return len(self.hardcoded) + self.referenced + self.called + self.operator
 
     def to_csv(self):
-        return [name, self.total, len(self.hardcoded), self.referenced,
+        return [self.name, self.total, len(self.hardcoded), self.referenced,
                 self.called, self.operator, self.param, medianif(self.hardcoded),
                 minif(self.hardcoded), maxif(self.hardcoded)]
 
