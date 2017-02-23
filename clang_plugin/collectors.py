@@ -69,7 +69,7 @@ ServiceClientTuple = namedtuple("ServiceClientTuple",
 
 SpinRateTuple = namedtuple("SpinRateTuple",
                            ["rate", "variable", "function", "line",
-                            "param_rate"])
+                            "param_rate", "is_duration", "wall"])
 
 ParamTuple = namedtuple("ParamTuple", ["param", "variable", "default",
                                        "param_type", "function", "line"])
@@ -456,334 +456,69 @@ class ParamStatistics(object):
         return rows
 
 
+class StatValues(object):
+    def __init__(self, name = ""):
+        self.name       = name
+        self.hardcoded  = []
+        self.referenced = 0
+        self.called     = 0
+        self.operator   = 0
+        self.param      = 0
 
-###############################################################################
-# Visitor Collector
-###############################################################################
+    @property
+    def total(self):
+        return len(self.hardcoded) + self.referenced + self.called + self.operator
 
-class VisitorCollector(object):
+    def to_csv(self):
+        return [name, self.total, len(self.hardcoded), self.referenced,
+                self.called, self.operator, self.param, medianif(self.hardcoded),
+                minif(self.hardcoded), maxif(self.hardcoded)]
+
+
+class SpinStatistics(object):
     def __init__(self):
-        self.pub                = PublisherStatistics()
-        self.sub                = SubscriberStatistics()
-        self.rpc                = RpcStatistics()
-        self.param              = ParamStatistics()
-        self.total_rates        = 0
-        self.hardcoded_rates    = []
-        self.function_calls     = []
-        self.distinct_calls     = []
+        self.rates          = StatValues("Rate")
+        self.wallrates      = StatValues("WallRate")
+        self.durations      = StatValues("Duration")
+        self.walldurations  = StatValues("WallDuration")
+        self.total          = StatValues("Total")
 
-    @property
-    def total_pub_sub(self):
-        return self.sub.total_subscribers + self.pub.total_publishers
-
-    @property
-    def total_rpc(self):
-        return self.rpc.total_rpc
-
-    @property
-    def global_topics(self):
-        return self.pub.global_topics + self.sub.global_topics \
-               + self.rpc.global_topics
-
-    @property
-    def function_callbacks(self):
-        return self.sub.function_callbacks + self.rpc.function_callbacks
-
-    @property
-    def method_callbacks(self):
-        return self.sub.method_callbacks + self.rpc.method_callbacks
-
-    @property
-    def boost_callbacks(self):
-        return self.sub.boost_callbacks + self.rpc.boost_callbacks
-
-    def _from_variable(self, variable, nesting):
-        global pubsub_var
-        name = variable.name
-        if variable.result == "ros::Rate":
-            if isinstance(variable.value, CppFunctionCall):
-                value = None
-                if len(variable.value.arguments) > 0:
-                    value = variable.value.arguments[0]
-                o = SpinRateTuple(value, name, self.function, variable.line)
-                self.spin_rate.append(o)
-        elif variable.result == "ros::Publisher" \
-                or variable.result == "ros::Subscriber" \
-                or variable.result == "ros::ServiceServer" \
-                or variable.result == "ros::ServiceClient":
-            if variable.result == "ros::Publisher" or variable.result == "ros::Subscriber":
-                pubsub_var += 1
-            self._collect(variable.value, nesting, variable = name)
-        elif isinstance(variable.value, CppFunctionCall) \
-                and variable.value.name == "param":
-            self._from_call(variable.value, nesting, variable = name)
-
-    _FUNCTION_NAMES = ("advertise", "subscribe", "publish", "advertiseService",
-                       "serviceClient", "sleep", "param", "getParam", "Rate",
-                       "getParamCached")
-
-    def visit_function_call(self, call):
-        global advertise_count
-        global subscribe_count
-        # TODO a function map seems better by now...
-        name = call.name
-        if name in VisitorCollector._FUNCTION_NAMES:
-            call.simplify()
-            nest = control_nesting(call)
-
-        if name == "operator=":
-            call.simplify()
-            if len(call.arguments) >= 2 and isinstance(call.arguments[1], CppFunctionCall):
-                self._from_call(call.arguments[1], nesting,
-                                variable = call.arguments[0].name)
-            elif len(call.arguments) < 2:
-                print "[CLANG]", name, call.arguments
-            return
-        self.function_set.add(name)
-        self.function_calls += 1
-        if name == "advertise" and call.result == "ros::Publisher":
-            advertise_count += 1
-            self._advertise_call(call, nesting, variable = variable)
-        elif name == "subscribe" and call.result == "ros::Subscriber":
-            subscribe_count += 1
-            self._subscribe_call(call, nesting, variable = variable)
-        elif name == "publish" and call.method_of \
-                and call.method_of.result == "ros::Publisher":
-            call.simplify()
-            o = PublishTuple(call.method_of.name, nesting,
-                             self.function, call.line, call.scope)
-            self.publish.append(o)
-        elif name == "advertiseService" and call.result == "ros::ServiceServer":
-            self._advertise_service_call(call, nesting, variable = variable)
-        elif name == "serviceClient" and call.result == "ros::ServiceClient":
-            self._service_client_call(call, nesting, variable = variable)
-        elif name == "sleep" and call.method_of \
-                and call.method_of.result == "ros::Rate":
-            call.simplify()
-            self.sleep.append(call)
-        elif name == "param":
-            call.simplify()
-            self._param_call(call, nesting, variable = variable)
-        elif name == "getParam" or name == "getParamCached":
-            call.simplify()
-            self._get_param_call(call, nesting, variable = variable)
-
-
-    def _advertise_call(self, call, nesting, variable = None):
-        nargs = len(call.arguments)
-        call.simplify()
-        topic       = None
-        queue_size  = None
-        latch       = False
-        if nargs == 1:
-            atype = ADV_TYPE_3
+    def collect_spin(self, datum):
+        if datum.is_duration:
+            vals = self.durations
+            if datum.wall:
+                vals = self.walldurations
         else:
-            assert nargs == 3 or nargs == 6
-            atype = ADV_TYPE_1 if nargs == 3 else ADV_TYPE_2
-            topic       = call.arguments[0]
-            queue_size  = call.arguments[1]
-            latch       = call.arguments[-1]
-            latch       = latch if isinstance(latch, bool) else None
-        self.advertise.append(AdvertiseTuple(topic, queue_size,
-                call.template, nesting, variable, self.function, call.line,
-                atype, latch))
+            vals = self.rates
+            if datum.wall:
+                vals = self.wallrates
+        if isinstance(datum.rate, (int, long, float)):
+            vals.hardcoded.append(datum.rate)
+            self.total.hardcoded.append(datum.rate)
+        elif isinstance(datum.rate, CppReference):
+            vals.referenced += 1
+            self.total.referenced += 1
+        elif isinstance(datum.rate, CppOperator):
+            vals.operator += 1
+            self.total.operator += 1
+        elif isinstance(datum.rate, CppFunctionCall):
+            vals.called += 1
+            self.total.called += 1
+        if datum.param_rate:
+            vals.param += 1
+            self.total.param += 1
 
-    def _subscribe_call(self, call, nesting, variable = None):
-        nargs = len(call.arguments)
-        call.simplify()
-        topic       = None
-        queue_size  = None
-        callback    = None
-        msg_type    = None
-        hints       = False
-        if nargs == 1:
-            # assert call.arguments[0].result == "ros::SubscribeOptions"
-            stype = SUB_TYPE_4
-        else:
-            # nargs == 4 (function) or nargs == 5 (method/boost)
-            assert nargs == 4 or nargs == 5
-            topic       = call.arguments[0]
-            queue_size  = call.arguments[1]
-            cb          = call.arguments[2]
-            if isinstance(cb, CppOperator) and cb.is_unary:
-                cb = cb.arguments[0]
-            callback = cb.name
-            msg_type = self._msg_type_from_callback(cb)
-            if nargs == 4:
-                stype = SUB_TYPE_2
-            else:
-                if isinstance(call.arguments[3], CppDefaultArgument) \
-                        or cb.result.startswith("boost::function"):
-                    stype = SUB_TYPE_3
-                else:
-                    stype = SUB_TYPE_1
-            hints = not isinstance(call.arguments[-1], CppDefaultArgument)
-        self.subscribe.append(SubscribeTuple(topic, queue_size, callback,
-                msg_type, nesting, variable, self.function,
-                call.line, stype, hints))
+    _SPIN_HEADERS = ["Spinner", "Total", "Hard-coded", "Reference",
+                     "Function Call", "Operator", "Parameter",
+                     "Median Value", "Min. Value", "Max. Value"]
 
-    def _advertise_service_call(self, call, nesting, variable = None):
-        nargs = len(call.arguments)
-        call.simplify()
-        service     = None
-        callback    = None
-        msg_type    = None
-        events      = False
-        if nargs == 1:
-            atype = ADV_SRV_TYPE_4
-        else:
-            # nargs == 2 (function) or nargs == 3 (method/boost)
-            assert nargs == 2 or nargs == 3
-            service = call.arguments[0]
-            cb = call.arguments[1]
-            if isinstance(cb, CppOperator) and cb.is_unary:
-                cb = cb.arguments[0]
-            callback = cb.name
-            msg_type = self._msg_type_from_callback(cb)
-            events = "ros::ServiceEvent" in cb.result
-            if nargs == 2:
-                atype = ADV_SRV_TYPE_2
-            else:
-                if isinstance(call.arguments[2], CppDefaultArgument) \
-                        or cb.result.startswith("boost::function"):
-                    atype = ADV_SRV_TYPE_3
-                else:
-                    atype = ADV_SRV_TYPE_1
-        self.advertise_service.append(AdvertiseServiceTuple(service,
-                callback, msg_type, nesting, variable, self.function, call.line,
-                atype, events))
-
-    def _service_client_call(self, call, nesting, variable = None):
-        nargs = len(call.arguments)
-        call.simplify()
-        service = None
-        ctype = SRV_CLI_TYPE_1
-        if nargs == 1:
-            if "ros::ServiceClientOptions" in call.arguments[0].result:
-                ctype = SRV_CLI_TYPE_2
-        else:
-            service = call.arguments[0]
-        self.service_client.append(ServiceClientTuple(service,
-                call.template, nesting, variable, self.function,
-                call.line, ctype))
-
-    def _param_call(self, call, nesting, variable = None):
-        n = len(call.arguments)
-        if n == 2:      # T param(std::string &key, T &default_val)
-            result = call.result
-        elif n == 3:    # void param(std::string &key, T &val, T &default_val)
-            result = None
-            if call.arguments[1]:
-                variable = call.arguments[1].name
-                result = call.arguments[1].result
-        self.ros_parameters.append(ParamTuple(call.arguments[0],
-                variable, True, result, self.function, call.line))
-
-    def _get_param_call(self, call, nesting, variable = None):
-        if len(call.arguments) >= 2:
-            result = None
-            if call.arguments[1]:
-                variable = call.arguments[1].name
-                result = call.arguments[1].result
-            self.ros_parameters.append(ParamTuple(call.arguments[0],
-                    variable, False, result, self.function, call.line))
-
-
-    def _msg_type_from_callback(self, callback):
-        type_string = callback.result
-        type_string = type_string.split(None, 1)[1]
-        if not (type_string[0] == "(" and type_string[-1] == ")"):
-            print "[CLANG] Unknown message type:", type_string
-            return type_string
-        type_string = type_string[1:-1]
-        is_const = type_string.startswith("const ")
-        if is_const:
-            type_string = type_string[6:]
-        is_ref = type_string.endswith(" &")
-        if is_ref:
-            type_string = type_string[:-2]
-        is_ptr = type_string.endswith("::ConstPtr")
-        if is_ptr:
-            type_string = type_string[:-10]
-        else:
-            is_ptr = type_string.endswith("ConstPtr")
-            if is_ptr:
-                type_string = type_string[:-8]
-        return type_string
-
-
-    def collect(self, function_collector):
-        for datum in function_collector.subscribe:
-            self.sub.collect_subscribe(datum)
-        for datum in function_collector.advertise:
-            self.pub.collect_advertise(datum)
-        for datum in function_collector.publish:
-            self.pub.collect_publish(datum)
-        for datum in function_collector.advertise_service:
-            self.rpc.collect_server(datum)
-        for datum in function_collector.service_client:
-            self.rpc.collect_client(datum)
-        for datum in function_collector.ros_parameters:
-            self.param.collect_param(datum)
-        for datum in function_collector.spin_rate:
-            self.total_rates += 1
-            if isinstance(datum.rate, (int, long)):
-                self.hardcoded_rates.append(datum.rate)
-        self.function_calls.append(function_collector.function_calls)
-        self.distinct_calls.append(len(function_collector.function_set))
-
-    def collect_from_global_scope(self, global_scope):
-        assert isinstance(global_scope, CppGlobalScope)
-        data = [FunctionCollector(f) for f in collect_functions(global_scope)]
-        for collector in data:
-            self.collect(collector)
-        return data
-
-
-    _MSG_TYPE_HEADERS = [
-        "Message Type", "Median Subscriber Queue",
-        "Min. Subscriber Queue", "Max. Subscriber Queue",
-        "Median Publisher Queue",
-        "Min. Publisher Queue", "Max. Publisher Queue"
-    ]
-
-    def csv_message_types(self):
-        rows = [GlobalCollector._MSG_TYPE_HEADERS]
-        for msg, qs in self.sub.msg_to_queue.iteritems():
-            if not msg in self.pub.msg_to_queue:
-                rows.append([msg, median(qs), min(qs), max(qs), None, None, None])
-        for msg, qs in self.pub.msg_to_queue.iteritems():
-            inq = self.sub.msg_to_queue.get(msg)
-            if inq:
-                rows.append([msg, median(inq), min(inq), max(inq),
-                             median(qs), min(qs), max(qs)])
-            else:
-                rows.append([msg, None, None, None, median(qs), min(qs), max(qs)])
-        return rows
-
-    _OTHER_HEADERS = [
-        "Spin Rates", "Hard-coded Spin Rates", "Median Spin Rate",
-        "Min. Spin Rate", "Max. Spin Rate", "Median Function Calls",
-        "Min. Function Calls", "Max. Function Calls", "Median Unique Calls",
-        "Min. Unique Calls", "Max. Unique Calls"
-    ]
-
-    def csv_other(self):
-        rows = [GlobalCollector._OTHER_HEADERS]
-        data = [self.total_rates]
-        if self.hardcoded_rates:
-            data.extend([len(self.hardcoded_rates), median(self.hardcoded_rates),
-                         min(self.hardcoded_rates), max(self.hardcoded_rates)])
-        else:
-            data.extend([0, None, None, None])
-        if self.function_calls:
-            data.extend([median(self.function_calls), min(self.function_calls),
-                         max(self.function_calls), median(self.distinct_calls),
-                         min(self.distinct_calls), max(self.distinct_calls)])
-        else:
-            data.extend([None, None, None, None, None, None])
-        rows.append(data)
-        return rows
+    def csv_spin(self):
+        return [SpinStatistics._SPIN_HEADERS,
+                self.rates.to_csv(),
+                self.wallrates.to_csv(),
+                self.durations.to_csv(),
+                self.walldurations.to_csv(),
+                self.total.to_csv()]
 
 
 
@@ -799,12 +534,7 @@ class GlobalCollector(object):
         self.sub                = SubscriberStatistics()
         self.rpc                = RpcStatistics()
         self.param              = ParamStatistics()
-        self.total_rates        = 0
-        self.hardcoded_rates    = []
-        self.reference_rates    = 0
-        self.call_rates         = 0
-        self.operator_rates     = 0
-        self.param_rates        = 0
+        self.spin               = SpinStatistics()
         self.function_calls     = []
         self.distinct_calls     = []
         self.pub_data           = []
@@ -861,17 +591,7 @@ class GlobalCollector(object):
             self.param.collect_param(datum)
             if store: self.other_data.append(datum)
         for datum in function_collector.spin_rate:
-            self.total_rates += 1
-            if isinstance(datum.rate, (int, long)):
-                self.hardcoded_rates.append(datum.rate)
-            elif isinstance(datum.rate, CppReference):
-                self.reference_rates += 1
-            elif isinstance(datum.rate, CppOperator):
-                self.operator_rates += 1
-            elif isinstance(datum.rate, CppFunctionCall):
-                self.call_rates += 1
-            if datum.param_rate:
-                self.param_rates += 1
+            self.spin.collect_spin(datum)
             if store: self.other_data.append(datum)
         self.function_calls.append(function_collector.function_calls)
         self.distinct_calls.append(len(function_collector.function_set))
@@ -907,27 +627,14 @@ class GlobalCollector(object):
         return rows
 
     _OTHER_HEADERS = [
-        "Open Topics", "Spin Rates", "Hard-coded Spin Rates",
-        "Reference Spin Rates", "Function Call Spin Rates",
-        "Operator Spin Rates", "Param Spin Rates",
-        "Median Spin Rate", "Min. Spin Rate", "Max. Spin Rate",
+        "Open Topics", 
         "Median Function Calls", "Min. Function Calls", "Max. Function Calls",
         "Median Unique Calls", "Min. Unique Calls", "Max. Unique Calls"
     ]
 
     def csv_other(self):
         rows = [GlobalCollector._OTHER_HEADERS]
-        data = [self.open_topics, self.total_rates]
-        if self.hardcoded_rates:
-            data.extend([len(self.hardcoded_rates), self.reference_rates,
-                         self.call_rates, self.operator_rates,
-                         self.param_rates,
-                         median(self.hardcoded_rates),
-                         min(self.hardcoded_rates), max(self.hardcoded_rates)])
-        else:
-            data.extend([0, self.reference_rates,
-                         self.call_rates, self.operator_rates,
-                         self.param_rates, None, None, None])
+        data = [self.open_topics]
         if self.function_calls:
             data.extend([median(self.function_calls), min(self.function_calls),
                          max(self.function_calls), median(self.distinct_calls),
@@ -1112,7 +819,9 @@ class FunctionCollector(object):
     def _from_variable(self, variable, nesting):
         global pubsub_var
         name = variable.name
-        if variable.result == "ros::Rate":
+        if variable.result == "ros::Rate" or variable.result == "ros::WallRate" \
+                or variable.result == "ros::Duration" \
+                or variable.result == "ros::WallDuration":
             if isinstance(variable.value, CppFunctionCall):
                 value = None
                 svar = ()
@@ -1121,7 +830,9 @@ class FunctionCollector(object):
                 if isinstance(value, CppExpression):
                     svar = value.variables
                 o = SpinRateTuple(value, name, self.function, variable.line,
-                                  any(v in self.param_vars for v in svar))
+                                  any(v in self.param_vars for v in svar),
+                                  variable.result in ("ros::Duration", "ros::WallDuration"),
+                                  variable.result in ("ros::WallRate", "ros::WallDuration"))
                 self.spin_rate.append(o)
         elif variable.result == "ros::Publisher" \
                 or variable.result == "ros::Subscriber" \
@@ -1164,7 +875,10 @@ class FunctionCollector(object):
         elif name == "serviceClient" and call.result == "ros::ServiceClient":
             self._service_client_call(call, nesting, variable = variable)
         elif name == "sleep" and call.method_of \
-                and call.method_of.result == "ros::Rate":
+                and (call.method_of.result == "ros::Rate" \
+                or call.method_of.result == "ros::Duration" \
+                or call.method_of.result == "ros::WallDuration" \
+                or call.method_of.result == "ros::WallRate"):
             self.sleep.append(call)
         elif name == "param":
             self._param_call(call, nesting, variable = variable)
@@ -1391,3 +1105,18 @@ def median(values):
 
 def mean(values):
     return float(sum(values)) / max(len(values), 1)
+
+def medianif(values):
+    if values:
+        return median(values)
+    return None
+
+def minif(values):
+    if values:
+        return min(values)
+    return None
+
+def maxif(values):
+    if values:
+        return max(values)
+    return None

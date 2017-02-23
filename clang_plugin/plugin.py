@@ -428,6 +428,11 @@ def _export_param_type_csv(iface):
     iface.export_file("param_type.csv")
 
 def _export_other(iface):
+    with open("spin.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        for row in iface.state.metrics.spin.csv_spin():
+            out.writerow(row)
+    iface.export_file("spin.csv")
     with open("other.csv", "w") as csvfile:
         out = csv.writer(csvfile)
         for row in iface.state.metrics.csv_other():
