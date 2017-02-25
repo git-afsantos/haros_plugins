@@ -430,9 +430,21 @@ def _export_param_type_csv(iface):
 def _export_other(iface):
     with open("spin.csv", "w") as csvfile:
         out = csv.writer(csvfile)
-        for row in iface.state.metrics.spin.csv_spin():
+        rows = iface.state.metrics.spin.csv_spin()
+        for row in rows:
             out.writerow(row)
     iface.export_file("spin.csv")
+    headers = rows[0]
+    headers.insert(0, "Package")
+    with open("spin_pkg.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        out.writerow(headers)
+        for pkg, metrics in iface.state.pkg_metrics.iteritems():
+            rows = metrics.spin.csv_spin()[1:]
+            for row in rows:
+                row.insert(0, pkg)
+                out.writerow(row)
+    iface.export_file("spin_pkg.csv")
     with open("other.csv", "w") as csvfile:
         out = csv.writer(csvfile)
         for row in iface.state.metrics.csv_other():

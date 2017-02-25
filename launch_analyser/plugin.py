@@ -418,12 +418,19 @@ class LaunchFileAnalyser(object):
     def _param_tag(self, tag):
         attrib = self._attributes(tag.attrib, LaunchFileAnalyser._PARAM_ATTRS)
         self._scope.launch.stats.n_params += 1
+        if attrib.get("command"):
+            self._scope.launch.stats.n_cmd_param += 1
+        elif attrib.get("textfile") or attrib.get("binfile"):
+            self._scope.launch.stats.n_file_param += 1
 
     _ROSPARAM_ATTRS = ("command", "file", "param", "ns", "subst_value")
 
     def _rosparam_tag(self, tag):
         attrib = self._attributes(tag.attrib, LaunchFileAnalyser._ROSPARAM_ATTRS)
         self._scope.launch.stats.n_rosparams += 1
+        cmd = attrib.get("command", "load")
+        if cmd == "load" and attrib.get("file"):
+            self._scope.launch.stats.n_file_param += 1
 
     _GROUP_ATTRS = ("ns", "clear_params")
 
@@ -490,6 +497,7 @@ class LaunchScope(object):
         if value is None:
             value = default
             self.launch.unknown.append(("env", var))
+        self.launch.stats.n_read_env += 1
         return value
 
     def get_anon(self, name):
@@ -554,7 +562,8 @@ class LaunchScope(object):
         else:
             if not is_default or prev is None:
                 args[name] = value
-            self.launch.stats.n_set_args += 1
+            if not is_default:
+                self.launch.stats.n_set_args += 1
         self.launch.stats.n_args += 1
 
     def create_param(self, name, value, condition):
@@ -705,6 +714,9 @@ class Stats(object):
         self.n_if           = 0
         self.n_test         = 0
         self.n_unk_includes = 0
+        self.n_read_env     = 0
+        self.n_file_param   = 0
+        self.n_cmd_param    = 0
 
     @property
     def n_packages(self):
@@ -748,6 +760,9 @@ class Stats(object):
         self.n_if += other.n_if
         self.n_test += other.n_test
         self.n_unk_includes += other.n_unk_includes
+        self.n_read_env += other.n_read_env
+        self.n_file_param += other.n_file_param
+        self.n_cmd_param += other.n_cmd_param
 
     _CSV_HEADERS = ["Name", "Arg", "Arg Value", "Param", "ROSParam", "Nodes",
                     "Unique Nodes", "Nodelets", "Conditional Nodes",
@@ -755,7 +770,8 @@ class Stats(object):
                     "Remote Nodes", "Node Args", "Machines", "Tests", "Packages",
                     "Conditional Packages", "Remaps", "Conditionals", "Includes",
                     "Repeated Includes", "Unknown Includes", "Include Args",
-                    "Env. Sets", "Unknown References", "Unknown Arg", "Unknown Env"]
+                    "Env. Sets", "Unknown References", "Unknown Arg",
+                    "Unknown Env", "File Params", "Cmd Params", "Env Reads"]
 
     def to_csv(self):
         return [self.name, self.n_args, self.n_set_args, self.n_params,
@@ -765,4 +781,5 @@ class Stats(object):
                 self.n_machines, self.n_test, len(self.pkgs), len(self.cond_pkgs),
                 self.n_remaps, self.n_if, self.n_includes, self.n_repeat_includes,
                 self.n_unk_includes, self.n_pass_args, self.n_env, self.n_unknown,
-                self.n_unk_args, self.n_unk_env]
+                self.n_unk_args, self.n_unk_env, self.n_file_param,
+                self.n_cmd_param, self.n_read_env]
