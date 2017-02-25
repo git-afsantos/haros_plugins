@@ -100,6 +100,7 @@ class SubscriberStatistics(object):
         self.function_callbacks = 0
         self.method_callbacks   = 0
         self.boost_callbacks    = 0
+        self.custom_msgs        = 0
 
     @property
     def total_subscribers(self):
@@ -144,6 +145,13 @@ class SubscriberStatistics(object):
             self.function_callbacks += 1
         elif datum.overload == SUB_TYPE_3:
             self.boost_callbacks += 1
+        if not datum.message_type.startswith(SubscriberStatistics._DEFAULT_MSGS):
+            self.custom_msgs += 1
+
+    _DEFAULT_MSGS = ("std_msgs::", "actionlib_msgs::", "common_msgs::",
+                     "diagnostic_msgs::", "geometry_msgs::", "nav_msgs::",
+                     "sensor_msgs::", "shape_msgs::", "stereo_msgs::",
+                     "trajectory_msgs::", "visualization_msgs::")
 
     def _collect_message(self, datum):
         m = datum.message_type
@@ -163,7 +171,8 @@ class SubscriberStatistics(object):
         "Operator Queue Sizes", "Param Queue Sizes",
         "Infinite Queues",
         "Median Queue Size", "Min. Queue Size", "Max. Queue Size",
-        "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting"
+        "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting",
+        "Custom Msgs"
     ]
 
     def csv_subscribe(self):
@@ -191,6 +200,7 @@ class SubscriberStatistics(object):
                          max(self.nesting)])
         else:
             data.extend([None, None, None])
+        data.append(self.custom_msgs)
         rows.append(data)
         return rows
 
@@ -214,6 +224,7 @@ class PublisherStatistics(object):
         self.publish_nesting    = []
         self.global_topics      = 0
         self.subscriber_status  = 0
+        self.custom_msgs        = 0
 
     @property
     def total_publishers(self):
@@ -254,9 +265,16 @@ class PublisherStatistics(object):
             self.latching_topics += 1
         if datum.overload == ADV_TYPE_2:
             self.subscriber_status += 1
+        if not datum.message_type.startswith(SubscriberStatistics._DEFAULT_MSGS):
+            self.custom_msgs += 1
 
     def collect_publish(self, datum):
         self.publish_nesting.append(datum.nesting)
+
+    _DEFAULT_MSGS = ("std_msgs::", "actionlib_msgs::", "common_msgs::",
+                     "diagnostic_msgs::", "geometry_msgs::", "nav_msgs::",
+                     "sensor_msgs::", "shape_msgs::", "stereo_msgs::",
+                     "trajectory_msgs::", "visualization_msgs::")
 
     def _collect_message(self, datum):
         m = datum.message_type
@@ -278,7 +296,7 @@ class PublisherStatistics(object):
         "Min. Queue Size", "Max. Queue Size",
         "Median Control Nesting", "Min. Control Nesting", "Max. Control Nesting",
         "Publish Calls", "Median Control Nesting",
-        "Min. Control Nesting", "Max. Control Nesting"
+        "Min. Control Nesting", "Max. Control Nesting", "Custom Msgs"
     ]
 
     def csv_publish(self):
@@ -307,6 +325,7 @@ class PublisherStatistics(object):
                          min(self.publish_nesting), max(self.publish_nesting)])
         else:
             data.extend([0, None, None, None])
+        data.append(self.custom_msgs)
         rows.append(data)
         return rows
 
@@ -482,6 +501,7 @@ class SpinStatistics(object):
         self.durations      = StatValues("Duration")
         self.walldurations  = StatValues("WallDuration")
         self.total          = StatValues("Total")
+        self.spinners       = 0
 
     def collect_spin(self, datum):
         if datum.is_duration:
@@ -571,6 +591,10 @@ class GlobalCollector(object):
     def open_topics(self):
         return len(set(self.pub.hardcoded_topics) ^ set(self.sub.hardcoded_topics))
 
+    @property
+    def custom_msgs(self):
+        return self.sub.custom_msgs + self.pub.custom_msgs
+
     def collect(self, function_collector, store = False):
         for datum in function_collector.subscribe:
             self.sub.collect_subscribe(datum)
@@ -592,6 +616,7 @@ class GlobalCollector(object):
             if store: self.other_data.append(datum)
         for datum in function_collector.spin_rate:
             self.spin.collect_spin(datum)
+            self.spin.spinners += function_collector.spinner_vars
             if store: self.other_data.append(datum)
         self.function_calls.append(function_collector.function_calls)
         self.distinct_calls.append(len(function_collector.function_set))
@@ -627,14 +652,14 @@ class GlobalCollector(object):
         return rows
 
     _OTHER_HEADERS = [
-        "Open Topics", 
+        "Open Topics", "Custom Msgs", "Spinner Vars",
         "Median Function Calls", "Min. Function Calls", "Max. Function Calls",
         "Median Unique Calls", "Min. Unique Calls", "Max. Unique Calls"
     ]
 
     def csv_other(self):
         rows = [GlobalCollector._OTHER_HEADERS]
-        data = [self.open_topics]
+        data = [self.open_topics, self.custom_msgs, self.spin.spinners]
         if self.function_calls:
             data.extend([median(self.function_calls), min(self.function_calls),
                          max(self.function_calls), median(self.distinct_calls),
@@ -790,6 +815,7 @@ class FunctionCollector(object):
         self.set_param_count    = 0
         self.function_set       = set()
         self.function_calls     = 0
+        self.spinner_vars       = 0
         for statement in function.body.body:
             self._collect(statement)
 
@@ -822,6 +848,7 @@ class FunctionCollector(object):
         if variable.result == "ros::Rate" or variable.result == "ros::WallRate" \
                 or variable.result == "ros::Duration" \
                 or variable.result == "ros::WallDuration":
+            self.spinner_vars += 1
             if isinstance(variable.value, CppFunctionCall):
                 value = None
                 svar = ()

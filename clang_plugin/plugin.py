@@ -450,6 +450,17 @@ def _export_other(iface):
         for row in iface.state.metrics.csv_other():
             out.writerow(row)
     iface.export_file("other.csv")
+    headers = rows[0]
+    headers.insert(0, "Package")
+    with open("other_pkg.csv", "w") as csvfile:
+        out = csv.writer(csvfile)
+        out.writerow(headers)
+        for pkg, metrics in iface.state.pkg_metrics.iteritems():
+            rows = metrics.csv_other()[1:]
+            for row in rows:
+                row.insert(0, pkg)
+                out.writerow(row)
+    iface.export_file("other_pkg.csv")
     with open("pub_data.txt", "w") as datafile:
         datafile.write(iface.state.metrics.str_pub_data())
     iface.export_file("pub_data.txt")
