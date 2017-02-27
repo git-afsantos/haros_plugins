@@ -546,6 +546,7 @@ class LaunchScope(object):
             self.launch.stats.n_nodes += 1
             self.launch.stats.nodes.add(pkg + "/" + ntype)
             self.launch.stats.pkgs.add(pkg)
+            self.launch.stats.pkgs.update(_pkg_transitive(pkg, self.resource_finder))
             if pkg == "nodelet":
                 self.launch.stats.n_nodelets += 1
         scope.node = node
