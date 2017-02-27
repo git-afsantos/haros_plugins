@@ -447,7 +447,8 @@ def _export_other(iface):
     iface.export_file("spin_pkg.csv")
     with open("other.csv", "w") as csvfile:
         out = csv.writer(csvfile)
-        for row in iface.state.metrics.csv_other():
+        rows = iface.state.metrics.csv_other()
+        for row in rows:
             out.writerow(row)
     iface.export_file("other.csv")
     headers = rows[0]
