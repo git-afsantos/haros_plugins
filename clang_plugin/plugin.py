@@ -74,8 +74,22 @@ def file_analysis(iface, scope):
                     if d.severity >= clang.Diagnostic.Error:
                         print "[CLANG]", d.spelling
             # traverse nodes
-            print "[CLANG] analysing", file_path
+            # print "[CLANG] analysing", file_path
             data = _ast_analysis(unit, scope.package, state)
+
+
+def package_analysis(iface, scope):
+    analysed = False
+    cpps = [f for f in scope.source_files if f.language == "cpp"]
+    if cpps:
+        if not scope.id in iface.state.pkg_metrics:
+            iface.state.pkg_metrics[scope.id] = collectors.GlobalCollector()
+        for cpp in cpps:
+            for c in iface.state.database.getCompileCommands(cpp.get_path()) or []:
+                analysed = True
+                break
+        if not analysed:
+            print "[CLANG]", scope.id, "has C++ but no compile commands"
 
 
 def post_analysis(iface):
@@ -101,6 +115,7 @@ def post_analysis(iface):
                                              model.function_counter)
     print ""
     print "[CLANG] Analysis took", int(time.time() - iface.state.start), "seconds"
+    print "[CLANG]", len(iface.state.pkg_metrics), "C++ packages were analysed"
 
 
 
