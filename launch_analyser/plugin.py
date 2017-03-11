@@ -18,7 +18,7 @@ _log = logging.getLogger(__name__)
 
 class InternalState(object):
     def __init__(self):
-        self.gstats = Stats("global")
+        self.gstats = Statistics("global")
         self.fstats = {}
         self.pkg_depends = {}
         self.unknown_packages = set()

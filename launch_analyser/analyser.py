@@ -1,14 +1,15 @@
 
 ###
 # standard packages
+import os
 import xml.etree.ElementTree as ET
 
 ###
 # internal packages
 import launch_analyser.ros_model as ROS
 import launch_analyser.substitution_args as sub_args
-from launch_analyser.launch_model import LaunchFile, LaunchScope,
-                                         LaunchResourceGraph
+from launch_analyser.launch_model import LaunchFile, LaunchScope, \
+                                         LaunchResourceGraph, Condition
 
 
 UNKNOWN = "<?>"
@@ -34,6 +35,7 @@ class LaunchFileAnalyser(object):
                  "rosparam", "group", "test", "arg", "master")
 
     def analyse(self, launch_file, args = None, ns = "/"):
+        self.stats.name = launch_file
         launch = self._analyse(launch_file, args = args, ns = ns)
         launch = launch.merge()
         self.stats.gather(launch, self.resources)
@@ -111,7 +113,7 @@ class LaunchFileAnalyser(object):
                 ntype = ss[1]
 
         # create a scope for the private namespace of the node
-        self._scope = self._scope.node_scope(name, pkg, ntype,
+        self._scope = self._scope.node_scope(name, pkg, ntype, nodelet,
                                              argv, ns, attrib["if"])
         for child in tag:
             name = child.tag
