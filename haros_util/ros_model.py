@@ -63,14 +63,26 @@ class ResourceGraph(object):
     def get_node(self, name):
         return self._get(name, Node)
 
+    def get_nodes(self):
+        return self._get_all(Node)
+
     def get_param(self, name):
         return self._get(name, Parameter)
+
+    def get_params(self):
+        return self._get_all(Parameter)
 
     def get_topic(self, name):
         return self._get(name, Topic)
 
+    def get_topics(self):
+        return self._get_all(Topic)
+
     def get_service(self, name):
         return self._get(name, Service)
+
+    def get_services(self):
+        return self._get_all(Service)
 
     def _get(self, name, cls):
         r = self.resources.get(name)
@@ -82,6 +94,17 @@ class ResourceGraph(object):
                 if isinstance(r, cls):
                     return r
         return None
+
+    def _get_all(self, cls):
+        all = []
+        for _, r in self.resources.iteritems():
+            if isinstance(r, cls):
+                all.append(r)
+        for _, rs in self.collisions.iteritems():
+            for r in rs:
+                if isinstance(r, cls):
+                    all.append(r)
+        return all
 
     def register(self, resource):
         name = resource.full_name
@@ -101,6 +124,24 @@ class ResourceGraph(object):
         return ResourceGraph(resources = self.resources,
                              remaps = dict(self.remaps),
                              collisions = self.collisions)
+
+
+###############################################################################
+# ROS Model - Configuration
+###############################################################################
+
+# A configuration is more or less equivalent to an application.
+# It is the result of a launch file, plus environment, parameters, etc.
+# A configuration becomes invalid if there are unknown references.
+
+class Configuration(object):
+    def __init__(self, name, env, resources = None):
+        self.name = name
+        self.environment = env
+        self.resources = ResourceGraph() if resources is None else resources
+        self.valid = True
+        self.pkg_depends = set()
+        self.env_depends = set()
 
 
 ###############################################################################
