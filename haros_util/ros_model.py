@@ -13,16 +13,22 @@ class Resource(object):
 
 class Node(Resource):
     def __init__(self, name, pkg, ntype, nodelet = False, args = None,
-                 ns = "/", private_ns = ""):
+                 remaps = None, ns = "/", private_ns = ""):
         Resource.__init__(self, name, ns = ns, private_ns = private_ns)
         self.package = pkg
         self.node_type = ntype      # executable name
         self.nodelet = nodelet      # is this a nodelet?
         self.argv = args if not args is None else []
+        self.remaps = remaps if not remaps is None else {}
         self.publishers = []
         self.subscribers = []
         self.servers = []
         self.clients = []
+
+    @property
+    def reference(self):
+        return self.package + "/" + self.node_type
+
 
 class Topic(Resource):
     def __init__(self, name, ns = "/", private_ns = ""):
@@ -30,11 +36,13 @@ class Topic(Resource):
         self.subscribers = []
         self.publishers = []
 
+
 class Service(Resource):
     def __init__(self, name, ns = "/", private_ns = ""):
         Resource.__init__(self, name, ns = ns, private_ns = private_ns)
         self.server = None
         self.clients = []
+
 
 class Parameter(Resource):
     def __init__(self, name, ptype, value, ns = "/", private_ns = ""):
@@ -142,6 +150,9 @@ class Configuration(object):
         self.valid = True
         self.pkg_depends = set()
         self.env_depends = set()
+
+    def nodes(self):
+        return self.resources.get_nodes()
 
 
 ###############################################################################

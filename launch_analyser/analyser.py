@@ -6,7 +6,8 @@ import xml.etree.ElementTree as ET
 
 ###
 # internal packages
-import launch_analyser.ros_model as ROS
+from haros_util.events import Event
+import haros_util.ros_model as ROS
 import launch_analyser.substitution_args as sub_args
 from launch_analyser.launch_model import LaunchFile, LaunchScope, \
                                          LaunchResourceGraph, Condition
@@ -20,12 +21,13 @@ UNKNOWN = "<?>"
 ###############################################################################
 
 class LaunchFileAnalyser(object):
-    def __init__(self, environment, finder):
+    def __init__(self, environment, finder, resources = None):
     # public:
         self.visited_files = {}
         self.top_launch = None
-        self.resources = LaunchResourceGraph()
+        self.resources = LaunchResourceGraph(enabled = resources)
         self.stats = Statistics()
+        self.onNode = Event()
     # private:
         self._base_scope = LaunchScope(None, None, environment, finder,
                                        self.resources)
@@ -127,6 +129,8 @@ class LaunchFileAnalyser(object):
                 self.stats.env_tags += 1
             else:
                 raise InvalidTagError(name)
+
+        self.onNode(self._scope.node)
         self._scope = self._scope.scope
 
         self.stats.node_tags += 1

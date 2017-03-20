@@ -5,7 +5,7 @@ import rosgraph.names
 
 ###
 # internal packages
-import launch_analyser.ros_model as ROS
+import haros_util.ros_model as ROS
 
 
 ###
@@ -83,10 +83,9 @@ class LaunchFile(object):
 class LaunchNode(ROS.Node):
     def __init__(self, launch, name, pkg, ntype, nodelet = False,
                  args = None, ns = "/", remaps = None, conditions = None):
-        ROS.Node.__init__(self, name, pkg, ntype,
-                          nodelet = nodelet, args = args, ns = ns)
+        ROS.Node.__init__(self, name, pkg, ntype, nodelet = nodelet,
+                          args = args, remaps = remaps, ns = ns)
         self.launch = launch
-        self.remaps = remaps if not remaps is None else {}
         self.conditions = conditions if not conditions is None else ()
                           # if/unless conditions to launch
 

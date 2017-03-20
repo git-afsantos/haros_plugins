@@ -7,6 +7,10 @@ from ctypes import ArgumentError
 # third-party packages
 import clang.cindex as clang
 
+###
+# internal packages
+from haros_util.events import Event
+
 advertise_list = []
 subscribe_list = []
 function_counter = 0
@@ -267,6 +271,8 @@ class CppOperator(CppExpression):
 
 
 class CppFunctionCall(CppExpression):
+    onInstance = Event()
+
     def __init__(self, scope, name = "<anonymous>", result = "[type]",
                  args = None, cursor = None):
         CppExpression.__init__(self, scope, name, result, cursor)
@@ -276,6 +282,7 @@ class CppFunctionCall(CppExpression):
             self.arguments      = args if not args is None else []
             self.is_constructor = self.result.split("::")[-1] == self.name
             self.method_of      = None
+        CppFunctionCall.onInstance(self)
 
     def _read_cursor(self, cursor):
         assert cursor.kind == clang.CursorKind.CALL_EXPR
