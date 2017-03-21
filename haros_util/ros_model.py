@@ -68,31 +68,33 @@ class ResourceGraph(object):
             n += len(values)
         return n
 
-    def get_node(self, name):
-        return self._get(name, Node)
+    def get_node(self, name, remap = False):
+        return self._get(name, Node, remap)
 
     def get_nodes(self):
         return self._get_all(Node)
 
-    def get_param(self, name):
-        return self._get(name, Parameter)
+    def get_param(self, name, remap = False):
+        return self._get(name, Parameter, remap)
 
     def get_params(self):
         return self._get_all(Parameter)
 
-    def get_topic(self, name):
-        return self._get(name, Topic)
+    def get_topic(self, name, remap = False):
+        return self._get(name, Topic, remap)
 
     def get_topics(self):
         return self._get_all(Topic)
 
-    def get_service(self, name):
-        return self._get(name, Service)
+    def get_service(self, name, remap = False):
+        return self._get(name, Service, remap)
 
     def get_services(self):
         return self._get_all(Service)
 
-    def _get(self, name, cls):
+    def _get(self, name, cls, remap):
+        if remap:
+            name = self.remaps.get(name, name)
         r = self.resources.get(name)
         if r is None or isinstance(r, cls):
             return r
