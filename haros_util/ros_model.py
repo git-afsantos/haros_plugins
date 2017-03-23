@@ -9,6 +9,7 @@ class Resource(object):
         self.full_name = resolve_name(name, ns = ns, private_ns = private_ns)
         self.original_name = self.full_name
         self.name = self.full_name.split("/")[-1]
+        self.namespace = self.full_name.rsplit("/", 1)[0]
 
 
 class Node(Resource):
@@ -33,8 +34,8 @@ class Node(Resource):
 class Topic(Resource):
     def __init__(self, name, ns = "/", private_ns = ""):
         Resource.__init__(self, name, ns = ns, private_ns = private_ns)
-        self.subscribers = []
         self.publishers = []
+        self.subscribers = []
 
 
 class Service(Resource):
