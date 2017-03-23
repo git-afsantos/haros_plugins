@@ -26,6 +26,50 @@ USR_INCLUDE     = "/usr/include/"
 EIGEN_INCLUDE   = "/usr/include/eigen3"
 MAGICK_INCLUDE  = "/usr/include/ImageMagick"
 
+
+###############################################################################
+# Resource Generators
+###############################################################################
+
+class TopicGenerator(object):
+    def __init__(self, name, method):
+        self.name       = name
+        self.publisher  = method == "advertise"
+
+    def generate(self, node, resources):
+        name = ROS.resolve_name(self.name, ns = node.namespace)
+        topic = resources.get_topic(name, remap = True)
+        if topic is None:
+            topic = ROS.Topic(name)
+            resources.register(topic)
+        if self.publisher:
+            node.publishers.append(topic)
+            topic.publishers.append(node)
+        else:
+            node.subscribers.append(topic)
+            topic.subscribers.append(node)
+        return topic
+
+
+class ServiceGenerator(object):
+    def __init__(self, name, method):
+        self.name   = name
+        self.server = method == "advertiseService"
+
+    def generate(self, node, resources):
+        name = ROS.resolve_name(self.name, ns = node.namespace)
+        service = resources.get_service(name, remap = True)
+        if service is None:
+            service = ROS.Service(name)
+            resources.register(service)
+        if self.server:
+            node.servers.append(service)
+            service.server = node
+        else:
+            node.clients.append(service)
+            service.clients.append(node)
+        return service
+
 ###############################################################################
 # ROS Configuration Builder
 #       - extracts executables from CMakeLists
@@ -152,50 +196,6 @@ class ConfigurationBuilder(object):
                         if child.location.file \
                                 and child.location.file.name.startswith(CWS):
                             global_scope.add_from_cursor(child)
-
-
-###############################################################################
-# Resource Generators
-###############################################################################
-
-class TopicGenerator(object):
-    def __init__(self, name, method):
-        self.name       = name
-        self.publisher  = method == "advertise"
-
-    def generate(self, node, resources):
-        name = ROS.resolve_name(self.name, ns = node.namespace)
-        topic = resources.get_topic(name, remap = True)
-        if topic is None:
-            topic = ROS.Topic(name)
-            resources.register(topic)
-        if self.publisher:
-            node.publishers.append(topic)
-            topic.publishers.append(node)
-        else:
-            node.subscribers.append(topic)
-            topic.subscribers.append(node)
-        return topic
-
-
-class ServiceGenerator(object):
-    def __init__(self, name, method):
-        self.name   = name
-        self.server = method == "advertiseService"
-
-    def generate(self, node, resources):
-        name = ROS.resolve_name(self.name, ns = node.namespace)
-        service = resources.get_service(name, remap = True)
-        if service is None:
-            service = ROS.Service(name)
-            resources.register(service)
-        if self.server:
-            node.servers.append(service)
-            service.server = node
-        else:
-            node.clients.append(service)
-            service.clients.append(node)
-        return service
 
 
 ###############################################################################
