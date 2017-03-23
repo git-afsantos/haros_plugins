@@ -282,12 +282,12 @@ class CppFunctionCall(CppExpression):
             self.arguments      = args if not args is None else []
             self.is_constructor = self.result.split("::")[-1] == self.name
             self.method_of      = None
-        CppFunctionCall.onInstance(self)
 
     def _read_cursor(self, cursor):
         assert cursor.kind == clang.CursorKind.CALL_EXPR
         CppExpression._read_cursor(self, cursor)
         self._traverse(cursor)
+        CppFunctionCall.onInstance(self)
 
     def _traverse(self, cursor):
         if cursor.kind == clang.CursorKind.CALL_EXPR and cursor.spelling:
