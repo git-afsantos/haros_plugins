@@ -40,11 +40,56 @@ def _split_paren_args(text):
     return args
 
 
+class BuildTarget(object):
+    def __init__(self, name, files, is_executable):
+        self.name = name
+        self.base_name = name
+        self.prefix = "" if is_executable else "lib"
+        self.suffix = "" if is_executable else ".so"
+        self.files = files
+
+    @property
+    def output_name(self):
+        return self.prefix + self.base_name + self.suffix
+
+    @classmethod
+    def new_target(cls, name, files, directory, is_executable):
+        files = [os.path.join(directory, f) for fs in files \
+                                            for f in fs.split(";") if f]
+        i = 0
+        while i < len(files):
+            if not os.path.isfile(files[i]):
+                replacement = None
+                parent = os.path.dirname(files[i])
+                prefix = files[i].rsplit(os.sep, 1)[-1]
+                for f in os.listdir(parent):
+                    joined = os.path.join(parent, f)
+                    if f.startswith(prefix) and os.path.isfile(joined):
+                        replacement = joined
+                        break
+                if replacement:
+                    files[i] = replacement
+                else:
+                    del files[i]
+                    i -= 1
+            i += 1
+        return cls(name, files, is_executable)
+
+    def apply_property(self, prop, value):
+        if prop == "PREFIX":
+            self.prefix = value
+        elif prop == "SUFFIX":
+            self.suffix = value
+        elif prop == "OUTPUT_NAME":
+            self.base_name = value
+        # TODO elif prop == "<CONFIG>_OUTPUT_NAME":
+
+
 
 class CMakeAnalyser(object):
-    def __init__(self, var_data, environment, finder):
+    def __init__(self, environment, finder, srcdir, bindir, variables = None):
         self.resource_finder = finder
-        self.variables = var_data
+        self.variables = variables if not variables is None else {}
         self.environment = environment
         self.data = {
             "project":              None,
@@ -52,10 +97,13 @@ class CMakeAnalyser(object):
             "include_dirs":         [],
             "dependencies":         [],
             "system_dependencies":  [],
-            "libraries":            [],
-            "executables":          [],
+            "libraries":            {},
+            "executables":          {},
             "subdirectories":       []
         }
+        self.source_dir = srcdir
+        self.binary_dir = bindir
+        self.variables["CMAKE_BINARY_DIR"] = bindir
 
     _CONTROL_FLOW = ("if", "else", "elseif", "foreach", "while")
 
@@ -63,7 +111,11 @@ class CMakeAnalyser(object):
         self.directory = os.path.dirname(cmakelists)
         if toplevel:
             self.directory = os.path.abspath(self.directory)
+            self.variables["CMAKE_SOURCE_DIR"] = self.directory
         self.variables["CMAKE_CURRENT_SOURCE_DIR"] = self.directory
+        self.variables["CMAKE_CURRENT_LIST_FILE"] = cmakelists
+        self.variables["CMAKE_CURRENT_LIST_DIR"] = self.directory
+        self.variables["CMAKE_CURRENT_BINARY_DIR"] = self.binary_dir + self.directory[len(self.source_dir):]
         parser = cmakeparser.parse_file(cmakelists)
         for stmt in parser.parsetree:
             command = stmt[0].lower()
@@ -76,8 +128,9 @@ class CMakeAnalyser(object):
         for subdir in self.data["subdirectories"]:
             path = os.path.join(self.directory, subdir, "CMakeLists.txt")
             if os.path.isfile(path):
-                analyser = CMakeAnalyser(dict(self.variables), self.environment,
-                                         self.resource_finder)
+                analyser = CMakeAnalyser(self.environment, self.resource_finder,
+                                         self.source_dir, self.binary_dir,
+                                         variables = dict(self.variables))
                 analyser.analyse(path, toplevel = False)
                 self._merge(analyser)
 
@@ -119,6 +172,8 @@ class CMakeAnalyser(object):
             self._process_catkin_package(args)
         elif command == "file":
             self._process_file(args)
+        elif command == "set_target_properties":
+            self._process_set_target_properties(args)
 
     def _process_include_directories(self, args):
         n = len(args)
@@ -147,8 +202,8 @@ class CMakeAnalyser(object):
             i += 1
         if args[i] in ("IMPORTED", "ALIAS", "OBJECT", "INTERFACE"):
             return # TODO
-        args = [os.path.join(self.directory, f) for f in args[i:] if f]
-        self.data["libraries"].append((name, args))
+        target = BuildTarget.new_target(name, args[i:], self.directory, False)
+        self.data["libraries"][name] = target
 
     def _process_executable(self, args):
         n = len(args)
@@ -160,8 +215,30 @@ class CMakeAnalyser(object):
         while args[i] == "WIN32" or args[i] == "MACOSX_BUNDLE" \
                                  or args[i] == "EXCLUDE_FROM_ALL":
             i += 1
-        args = [os.path.join(self.directory, f) for f in args[i:] if f]
-        self.data["executables"].append((name, args))
+        target = BuildTarget.new_target(name, args[i:], self.directory, True)
+        self.data["executables"][name] = target
+
+    def _process_set_target_properties(self, args):
+        assert len(args) >= 4
+        i = args.index("PROPERTIES")
+        targets = args[:i]
+        k = 0
+        while k < len(targets):
+            t = targets[k]
+            t = self.data["libraries"].get(t, self.data["executables"].get(t))
+            if t:
+                targets[k] = t
+            else:
+                del targets[k]
+                k -= 1
+            k += 1
+        i += 1
+        while i < len(args):
+            prop = args[i]
+            value = args[i+1]
+            for t in targets:
+                t.apply_property(prop, value)
+            i += 2
 
     def _process_set(self, args):
         n = len(args)
@@ -388,10 +465,10 @@ class CMakeAnalyser(object):
         while i < n and arg[i] != "$":
             i += 1
         if i == n:
-            return arg
+            return arg.replace('"', "")
         prefix = arg[:i]
         suffix = self._maybe_variable(arg[i:])
-        return prefix + suffix
+        return (prefix + suffix).replace('"', "")
 
     def _maybe_variable(self, arg):
         assert arg[0] == "$"
@@ -414,6 +491,5 @@ class CMakeAnalyser(object):
 
     def _merge(self, other):
         self.data["include_dirs"].extend(other.data["include_dirs"])
-        self.data["libraries"].extend(other.data["libraries"])
-        self.data["executables"].extend(other.data["executables"])
-
+        self.data["libraries"].update(other.data["libraries"])
+        self.data["executables"].update(other.data["executables"])
