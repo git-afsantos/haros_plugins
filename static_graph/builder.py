@@ -101,18 +101,25 @@ class ConfigurationBuilder(object):
         """Register executables from a package's CMakeLists.
             This has to be called *before* 'from_launch'.
         """
+        srcdir = package.path[len(CWS):]
+        srcdir = CWS + srcdir.split(os.sep, 1)[0]
         executables = {}
-        self._exe[package.name] = executables
-        parser = CMakeAnalyser({
+        variables = {
             "catkin_INCLUDE_DIRS":      CATKIN_INCLUDE,
             "Boost_INCLUDE_DIRS":       USR_INCLUDE,
             "Eigen_INCLUDE_DIRS":       EIGEN_INCLUDE,
             "ImageMagick_INCLUDE_DIRS": MAGICK_INCLUDE,
             "PROJECT_SOURCE_DIR":       package.path
-        }, self.environment, finder)
+        }
+        self._exe[package.name] = executables
+        parser = CMakeAnalyser(self.environment, finder,
+                               srcdir, DB_PATH,
+                               variables = variables)
         parser.analyse(os.path.join(package.path, "CMakeLists.txt"))
-        for exe in parser.data["executables"] + parser.data["libraries"]:
-            executables[exe[0]] = exe[1]
+        for exe in parser.data["libraries"].itervalues():
+            executables[exe.output_name] = exe.files
+        for exe in parser.data["executables"].itervalues():
+            executables[exe.output_name] = exe.files
 
     def from_launch(self, launch_file, finder):
         """Build a Configuration, given a launch file.
@@ -150,6 +157,10 @@ class ConfigurationBuilder(object):
 
     def _onNode(self, node):
         """Called right after a <node> is parsed from the launch file."""
+        node._analysed = False
+        if node.conditions:
+            print "conditional node ignored [{}/{}]".format(node.package, node.node_type)
+            return False
         ref = node.reference
         if not ref in self._gen:
             self._gen_entry = []
@@ -159,6 +170,7 @@ class ConfigurationBuilder(object):
         assert ref in self._gen
         for generator in self._gen[ref]:
             generator.generate(node, self._config.resources)
+            node._analysed = True
 
 
     _CALLS = {
@@ -178,9 +190,14 @@ class ConfigurationBuilder(object):
 
 
     def _clang_analysis(self, node):
-        files = self._exe.get(node.package, {}).get(node.node_type, [])
+        files = self._exe.get(node.package, {}).get(node.node_type, ())
+        if not files:
+            print "no executables for node [{}/{}]".format(node.package, node.node_type)
         for f in files:
-            for c in self._db.getCompileCommands(f) or ():
+            cmd = self._db.getCompileCommands(f) or ()
+            if not cmd:
+                print "no commands for file", f
+            for c in cmd:
                 with cwd(os.path.join(DB_PATH, c.directory)):
                     args = ["-I" + STD_INCLUDES] + list(c.arguments)[1:]
                     index = clang.Index.create()

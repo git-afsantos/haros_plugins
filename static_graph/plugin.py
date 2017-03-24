@@ -4,6 +4,10 @@
 # - analyse nodes of the same type but different argv; memoize the rest.
 
 ###
+# standard packages
+import traceback
+
+###
 # internal packages
 from static_graph.builder import setup, ConfigurationBuilder
 
@@ -39,18 +43,40 @@ def package_analysis(iface, package):
 
 
 def post_analysis(iface):
-    for launch_file in iface.state.launch_files:
-        config = iface.state.builder.from_launch(launch_file, iface)
+    try:
+        #print iface.state.builder._exe["grizzly_motion"]
+        #return
+        for launch_file in iface.state.launch_files:
+            config = iface.state.builder.from_launch(launch_file, iface)
+            print
+            if not config:
+                print "Invalid launch file", launch_file.get_path()
+                continue
+            print config.name
+            print "Depends on packages:"
+            print "   ", config.pkg_depends
+            if config.env_depends:
+                print "Depends on environment:"
+                print "   ", config.env_depends
+            print "Nodes:"
+            for node in config.nodes():
+                print "  {} [{}/{}]".format(node.full_name, node.package, node.node_type)
+                if not node._analysed:
+                    print "    (not analysed)"
+                    continue
+                ts = map(lambda x: x.full_name, node.publishers)
+                if ts:
+                    print "    pub {}".format(ts)
+                ts = map(lambda x: x.full_name, node.subscribers)
+                print "    sub {}".format(ts)
+                ts = map(lambda x: x.full_name, node.servers)
+                if ts:
+                    print "    srv {}".format(ts)
+                ts = map(lambda x: x.full_name, node.clients)
+                if ts:
+                    print "    cli {}".format(ts)
+    except Exception as e:
+        print traceback.print_exc()
+    if iface.state.builder.unknown_packages:
         print
-        print config.name
-        print "Depends on packages:"
-        print "   ", config.pkg_depends
-        print "Depends on environment:"
-        print "   ", config.env_depends
-        print "Nodes:"
-        for node in config.nodes():
-            print "  {}[{}/{}]".format(node.full_name, node.package, node.node_type)
-            print "    pub {}".format(map(lambda x: x.full_name, node.publishers))
-            print "    sub {}".format(map(lambda x: x.full_name, node.subscribers))
-            print "    srv {}".format(map(lambda x: x.full_name, node.servers))
-            print "    cli {}".format(map(lambda x: x.full_name, node.clients))
+        print "Unknown packages", iface.state.builder.unknown_packages
