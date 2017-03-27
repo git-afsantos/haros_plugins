@@ -898,7 +898,10 @@ class CppGlobalScope(object):
             self.children.append(CppNamespace(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.CLASS_DECL:
             self.children.append(CppClass(self, cursor = cursor))
-        elif cursor.kind == clang.CursorKind.FUNCTION_DECL:
+        elif cursor.kind == clang.CursorKind.FUNCTION_DECL \
+                or cursor.kind == clang.CursorKind.CXX_METHOD \
+                or cursor.kind == clang.CursorKind.CONSTRUCTOR \
+                or cursor.kind == clang.CursorKind.DESTRUCTOR:
             self.children.append(CppFunction(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.VAR_DECL:
             self.children.append(CppVariable(self, cursor = cursor))
