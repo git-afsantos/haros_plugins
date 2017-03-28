@@ -896,6 +896,7 @@ class CppGlobalScope(object):
     def add_from_cursor(self, cursor):
         # TODO missing ENUM_DECL, TYPEDEF_DECL, STRUCT_DECL
         # CLASS_TEMPLATE, FUNCTION_TEMPLATE, USING_DECLARATION
+        # UNEXPOSED_DECL, USING_DIRECTIVE
         if cursor.kind == clang.CursorKind.NAMESPACE:
             self.children.append(CppNamespace(self, cursor = cursor))
         elif cursor.kind == clang.CursorKind.CLASS_DECL:
