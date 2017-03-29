@@ -70,6 +70,15 @@ class ServiceGenerator(object):
             service.clients.append(node)
         return service
 
+
+class ErrorGenerator(object):
+    def __init__(self, message):
+        self.message = message
+
+    def generate(self, node, resources):
+        node._error = self.message
+        return self.message
+
 ###############################################################################
 # ROS Configuration Builder
 #       - extracts executables from CMakeLists
@@ -115,11 +124,23 @@ class ConfigurationBuilder(object):
         parser = CMakeAnalyser(self.environment, finder,
                                srcdir, DB_PATH,
                                variables = variables)
+        if not os.path.isfile(os.path.join(package.path, "CMakeLists.txt")):
+            return
         parser.analyse(os.path.join(package.path, "CMakeLists.txt"))
         for exe in parser.data["libraries"].itervalues():
             executables[exe.output_name] = exe.files
         for exe in parser.data["executables"].itervalues():
             executables[exe.output_name] = exe.files
+        for lib, name in package.nodelets:
+            if not "." in lib:
+                lib += ".so"
+            pkg = name.split("/")[0]
+            name = name.split("/")[1]
+            exemap = self._exe.get(pkg, {})
+            if lib in exemap:
+                exemap[name] = exemap[lib]
+                del exemap[lib]
+            
 
     def from_launch(self, launch_file, finder):
         """Build a Configuration, given a launch file.
@@ -157,9 +178,10 @@ class ConfigurationBuilder(object):
 
     def _onNode(self, node):
         """Called right after a <node> is parsed from the launch file."""
+        node._error = None
         node._analysed = False
         if node.conditions:
-            print "conditional node ignored [{}/{}]".format(node.package, node.node_type)
+            node._error = "conditional node ignored [{}/{}]".format(node.package, node.node_type) 
             return False
         ref = node.reference
         if not ref in self._gen:
@@ -171,6 +193,8 @@ class ConfigurationBuilder(object):
         for generator in self._gen[ref]:
             generator.generate(node, self._config.resources)
             node._analysed = True
+        if not self._gen[ref]:
+            node._error = "no ROS primitives"
 
 
     _CALLS = {
@@ -182,7 +206,10 @@ class ConfigurationBuilder(object):
 
     def _onFunctionCall(self, call):
         """Called right after a function call is parsed from the C++ AST."""
+        #print "    function", call.name, call.result
         generator = ConfigurationBuilder._CALLS.get((call.name, call.result))
+        #if generator:
+            #print "    function", call
         if generator and len(call.arguments) > 1:
             topic = call.arguments[0]
             if isinstance(topic, basestring):
@@ -192,13 +219,15 @@ class ConfigurationBuilder(object):
     def _clang_analysis(self, node):
         files = self._exe.get(node.package, {}).get(node.node_type, ())
         if not files:
-            print "no executables for node [{}/{}]".format(node.package, node.node_type)
+            self._gen_entry.append(ErrorGenerator("no C++ source"))
         for f in files:
             cmd = self._db.getCompileCommands(f) or ()
             if not cmd:
-                print "no commands for file", f
+                self._gen_entry.append(ErrorGenerator("no compile commands for file " + f))
             for c in cmd:
                 with cwd(os.path.join(DB_PATH, c.directory)):
+                    #print
+                    #print f
                     args = ["-I" + STD_INCLUDES] + list(c.arguments)[1:]
                     index = clang.Index.create()
                     unit = index.parse(None, args)
@@ -210,8 +239,20 @@ class ConfigurationBuilder(object):
     # ----- actual AST analysis -----------------------------------------------
                     global_scope = CppGlobalScope()
                     for child in unit.cursor.get_children():
+                        #if not child.location.file:
+                            #print "  > cursor with no location"
+                        #if not child.location.file.name.startswith(CWS):
+                            #print "  > other file", child.location.file.name
                         if child.location.file \
                                 and child.location.file.name.startswith(CWS):
+                            if not (child.kind == clang.CursorKind.NAMESPACE \
+                                    or child.kind == clang.CursorKind.CLASS_DECL \
+                                    or child.kind == clang.CursorKind.FUNCTION_DECL \
+                                    or child.kind == clang.CursorKind.CXX_METHOD \
+                                    or child.kind == clang.CursorKind.CONSTRUCTOR \
+                                    or child.kind == clang.CursorKind.DESTRUCTOR \
+                                    or child.kind == clang.CursorKind.VAR_DECL):
+                                print "  > OTHER", child.kind
                             global_scope.add_from_cursor(child)
 
 

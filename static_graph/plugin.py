@@ -44,7 +44,7 @@ def package_analysis(iface, package):
 
 def post_analysis(iface):
     try:
-        #print iface.state.builder._exe["grizzly_motion"]
+        #print iface.state.builder._exe["kobuki_safety_controller"]
         #return
         for launch_file in iface.state.launch_files:
             config = iface.state.builder.from_launch(launch_file, iface)
@@ -61,8 +61,8 @@ def post_analysis(iface):
             print "Nodes:"
             for node in config.nodes():
                 print "  {} [{}/{}]".format(node.full_name, node.package, node.node_type)
-                if not node._analysed:
-                    print "    (not analysed)"
+                if not node._analysed or node._error:
+                    print "    [N/A]", node._error
                     continue
                 ts = map(lambda x: x.full_name, node.publishers)
                 if ts:
