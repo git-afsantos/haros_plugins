@@ -47,6 +47,11 @@ class BuildTarget(object):
         self.prefix = "" if is_executable else "lib"
         self.suffix = "" if is_executable else ".so"
         self.files = files
+        self.links = []
+
+    @property
+    def prefixed_name(self):
+        return self.prefix + self.base_name
 
     @property
     def output_name(self):
@@ -133,6 +138,8 @@ class CMakeAnalyser(object):
                                          variables = dict(self.variables))
                 analyser.analyse(path, toplevel = False)
                 self._merge(analyser)
+        if toplevel:
+            self._link_targets()
 
     def _analyse_control_flow(self, command, args, children):
         if command == "else":
@@ -174,6 +181,8 @@ class CMakeAnalyser(object):
             self._process_file(args)
         elif command == "set_target_properties":
             self._process_set_target_properties(args)
+        elif command == "target_link_libraries":
+            self._process_link_libraries(args)
 
     def _process_include_directories(self, args):
         n = len(args)
@@ -239,6 +248,31 @@ class CMakeAnalyser(object):
             for t in targets:
                 t.apply_property(prop, value)
             i += 2
+
+    def _process_link_libraries(self, args):
+        assert len(args) >= 2
+        t = args[0]
+        t = self.data["libraries"].get(t, self.data["executables"].get(t))
+        if not t:
+            return
+        for i in xrange(1, len(args)):
+            t.links.append(args[i])
+
+    def _link_targets(self):
+        for target in self.data["libraries"].itervalues():
+            candidates = target.links
+            target.links = []
+            for other in candidates:
+                d = self.data["libraries"].get(other, self.data["executables"].get(other))
+                if d:
+                    target.links.append(d)
+        for target in self.data["executables"].itervalues():
+            candidates = target.links
+            target.links = []
+            for other in candidates:
+                d = self.data["libraries"].get(other, self.data["executables"].get(other))
+                if d:
+                    target.links.append(d)
 
     def _process_set(self, args):
         n = len(args)

@@ -44,9 +44,11 @@ def package_analysis(iface, package):
 
 def post_analysis(iface):
     try:
-        #print iface.state.builder._exe["kobuki_safety_controller"]
+        #print iface.state.builder._exe["kobuki_node"]
         #return
         for launch_file in iface.state.launch_files:
+            if not launch_file.name.endswith("minimal.launch"):
+                continue
             config = iface.state.builder.from_launch(launch_file, iface)
             print
             if not config:

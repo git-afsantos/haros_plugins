@@ -128,12 +128,16 @@ class ConfigurationBuilder(object):
             return
         parser.analyse(os.path.join(package.path, "CMakeLists.txt"))
         for exe in parser.data["libraries"].itervalues():
-            executables[exe.output_name] = exe.files
+            fs = list(exe.files)
+            for link in exe.links:
+                fs.extend(link.files)
+            executables[exe.prefixed_name] = fs
         for exe in parser.data["executables"].itervalues():
-            executables[exe.output_name] = exe.files
+            fs = list(exe.files)
+            for link in exe.links:
+                fs.extend(link.files)
+            executables[exe.output_name] = fs
         for lib, name in package.nodelets:
-            if not "." in lib:
-                lib += ".so"
             pkg = name.split("/")[0]
             name = name.split("/")[1]
             exemap = self._exe.get(pkg, {})
