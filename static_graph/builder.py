@@ -190,8 +190,8 @@ class ConfigurationBuilder(object):
         ref = node.reference
         if not ref in self._gen:
             self._gen_entry = []
-            self._gen[ref] = self._gen_entry
             self._clang_analysis(node)
+            self._gen[ref]  = self._gen_entry
             self._gen_entry = None
         assert ref in self._gen
         for generator in self._gen[ref]:
@@ -210,10 +210,7 @@ class ConfigurationBuilder(object):
 
     def _onFunctionCall(self, call):
         """Called right after a function call is parsed from the C++ AST."""
-        #print "    function", call.name, call.result
         generator = ConfigurationBuilder._CALLS.get((call.name, call.result))
-        #if generator:
-            #print "    function", call
         if generator and len(call.arguments) > 1:
             topic = call.arguments[0]
             if isinstance(topic, basestring):
@@ -249,14 +246,14 @@ class ConfigurationBuilder(object):
                             #print "  > other file", child.location.file.name
                         if child.location.file \
                                 and child.location.file.name.startswith(CWS):
-                            if not (child.kind == clang.CursorKind.NAMESPACE \
-                                    or child.kind == clang.CursorKind.CLASS_DECL \
-                                    or child.kind == clang.CursorKind.FUNCTION_DECL \
-                                    or child.kind == clang.CursorKind.CXX_METHOD \
-                                    or child.kind == clang.CursorKind.CONSTRUCTOR \
-                                    or child.kind == clang.CursorKind.DESTRUCTOR \
-                                    or child.kind == clang.CursorKind.VAR_DECL):
-                                print "  > OTHER", child.kind
+                            #if not (child.kind == clang.CursorKind.NAMESPACE \
+                                    #or child.kind == clang.CursorKind.CLASS_DECL \
+                                    #or child.kind == clang.CursorKind.FUNCTION_DECL \
+                                    #or child.kind == clang.CursorKind.CXX_METHOD \
+                                    #or child.kind == clang.CursorKind.CONSTRUCTOR \
+                                    #or child.kind == clang.CursorKind.DESTRUCTOR \
+                                    #or child.kind == clang.CursorKind.VAR_DECL):
+                                #print "  > OTHER", child.kind
                             global_scope.add_from_cursor(child)
 
 
