@@ -2,25 +2,18 @@
 ###
 # standard packages
 import os
-import sys
-
-###
-# third-party packages
-import clang.cindex as clang
 
 ###
 # internal packages
 import haros_util.ros_model as ROS
-from clang_plugin.cpp_model import CppGlobalScope, CppFunctionCall
+from clang_plugin.new_cpp_model import CppAstParser, CppQuery
 from cmake_analyser.analyser import CMakeAnalyser
 from launch_analyser.analyser import LaunchFileAnalyser
 
 ###
 # constants
-LIB_PATH        = "/usr/lib/llvm-3.8/lib"
 CWS             = "/home/andre/catkin_ws/"
 DB_PATH         = "/home/andre/catkin_ws/build"
-STD_INCLUDES    = "/usr/lib/llvm-3.8/lib/clang/3.8.0/include"
 CATKIN_INCLUDE  = "/home/andre/catkin_ws/devel/include"
 USR_INCLUDE     = "/usr/include/"
 EIGEN_INCLUDE   = "/usr/include/eigen3"
@@ -88,8 +81,8 @@ class ErrorGenerator(object):
 ###############################################################################
 
 def setup():
-    sys.setrecursionlimit(2000)
-    clang.Config.set_library_path(LIB_PATH)
+    CppAstParser.set_library_path()
+    CppAstParser.set_database(DB_PATH)
 
 
 class ConfigurationBuilder(object):
@@ -100,11 +93,9 @@ class ConfigurationBuilder(object):
         self.unknown_packages = set()
     # private:
         self._config = None
-        self._db = clang.CompilationDatabase.fromDirectory(DB_PATH)
         self._exe = {}  # package -> (name -> [file])
         self._gen = {}  # cache to generate topics and services for nodes
         self._gen_entry = None
-        CppFunctionCall.onInstance.sub(self._onFunctionCall)
 
     def with_package(self, package, finder):
         """Register executables from a package's CMakeLists.
@@ -151,9 +142,7 @@ class ConfigurationBuilder(object):
             Control starts with the launch analyser.
             Whenever a node is parsed, control reverts to the builder.
             If the node is not cached, control is given to the clang parser.
-            Whenever a function call is parsed, control reverts to the builder.
-            If a primitive is detected, register the respective resource.
-            Control reverts to the clang parser until the end.
+            Whenever a primitive is detected, register the respective resource.
             Control reverts to the launch analyser until the end.
         """
         path = launch_file.get_path()
@@ -201,74 +190,37 @@ class ConfigurationBuilder(object):
             node._error = "no ROS primitives"
 
 
-    _CALLS = {
-        ("advertise",        "ros::Publisher"):     TopicGenerator,
-        ("subscribe",        "ros::Subscriber"):    TopicGenerator,
-        ("advertiseService", "ros::ServiceServer"): ServiceGenerator,
-        ("serviceClient",    "ros::ServiceClient"): ServiceGenerator
-    }
-
-    def _onFunctionCall(self, call):
-        """Called right after a function call is parsed from the C++ AST."""
-        generator = ConfigurationBuilder._CALLS.get((call.name, call.result))
-        if generator and len(call.arguments) > 1:
-            topic = call.arguments[0]
-            if isinstance(topic, basestring):
-                self._gen_entry.append(generator(topic, call.name))
-
-
     def _clang_analysis(self, node):
         files = self._exe.get(node.package, {}).get(node.node_type, ())
         if not files:
             self._gen_entry.append(ErrorGenerator("no C++ source"))
+        parser = CppAstParser(workspace = CWS)
         for f in files:
-            cmd = self._db.getCompileCommands(f) or ()
-            if not cmd:
+            gs = parser.parse(f)
+            if gs is None:
                 self._gen_entry.append(ErrorGenerator("no compile commands for file " + f))
-            for c in cmd:
-                with cwd(os.path.join(DB_PATH, c.directory)):
-                    #print
-                    #print f
-                    args = ["-I" + STD_INCLUDES] + list(c.arguments)[1:]
-                    index = clang.Index.create()
-                    unit = index.parse(None, args)
-    # ----- check for compilation problems ------------------------------------
-                    if unit.diagnostics:
-                        for d in unit.diagnostics:
-                            if d.severity >= clang.Diagnostic.Error:
-                                print "[CLANG]", d.spelling
-    # ----- actual AST analysis -----------------------------------------------
-                    global_scope = CppGlobalScope()
-                    for child in unit.cursor.get_children():
-                        #if not child.location.file:
-                            #print "  > cursor with no location"
-                        #if not child.location.file.name.startswith(CWS):
-                            #print "  > other file", child.location.file.name
-                        if child.location.file \
-                                and child.location.file.name.startswith(CWS):
-                            #if not (child.kind == clang.CursorKind.NAMESPACE \
-                                    #or child.kind == clang.CursorKind.CLASS_DECL \
-                                    #or child.kind == clang.CursorKind.FUNCTION_DECL \
-                                    #or child.kind == clang.CursorKind.CXX_METHOD \
-                                    #or child.kind == clang.CursorKind.CONSTRUCTOR \
-                                    #or child.kind == clang.CursorKind.DESTRUCTOR \
-                                    #or child.kind == clang.CursorKind.VAR_DECL):
-                                #print "  > OTHER", child.kind
-                            global_scope.add_from_cursor(child)
+    # ----- queries after parsing, since global scope is reused ---------------
+        for call in (CppQuery(parser.global_scope).all_calls
+                       .where_name("advertise")
+                       .where_result("ros::Publisher").get()):
+            self._onRosPrimitive(call, TopicGenerator)
+        for call in (CppQuery(parser.global_scope).all_calls
+                       .where_name("subscribe")
+                       .where_result("ros::Subscriber").get()):
+            self._onRosPrimitive(call, TopicGenerator)
+        for call in (CppQuery(parser.global_scope).all_calls
+                       .where_name("advertiseService")
+                       .where_result("ros::ServiceServer").get()):
+            self._onRosPrimitive(call, ServiceGenerator)
+        for call in (CppQuery(parser.global_scope).all_calls
+                       .where_name("serviceClient")
+                       .where_result("ros::ServiceClient").get()):
+            self._onRosPrimitive(call, ServiceGenerator)
 
 
-###############################################################################
-# Helper Functions
-###############################################################################
-
-class cwd:
-    """Run a block of code from a specified working directory"""
-    def __init__(self, path):
-        self.dir = path
-
-    def __enter__(self):
-        self.old_dir = os.getcwd()
-        os.chdir(self.dir)
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        os.chdir(self.old_dir)
+    def _onRosPrimitive(self, call, generator):
+        """Called after a primitive call is detected in the C++ AST."""
+        if len(call.arguments) > 1:
+            topic = call.arguments[0]
+            if isinstance(topic, basestring):
+                self._gen_entry.append(generator(topic, call.name))
