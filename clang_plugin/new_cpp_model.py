@@ -92,7 +92,8 @@ class CppVariable(CppEntity):
         CppEntity.__init__(self, scope, parent)
         self.id = id
         self.name = name
-        self.result = result
+        self.full_type = result
+        self.result = result[6:] if result.startswith("const ") else result
         self.value = None
         self.references = []
 
@@ -119,7 +120,8 @@ class CppFunction(CppEntity, CppStatementGroup):
         CppEntity.__init__(self, scope, parent)
         self.id = id
         self.name = name
-        self.result = result
+        self.full_type = result
+        self.result = result[6:] if result.startswith("const ") else result
         self.parameters = []
         self.body = CppBlock(self, self, explicit = True)
         self.references = []
@@ -158,7 +160,7 @@ class CppClass(CppEntity):
         self.references = []
 
     def _add(self, cppobj):
-        assert isinstance(cppobj, (CppFunction, CppVariable))
+        assert isinstance(cppobj, (CppFunction, CppVariable, CppClass))
         self.members.append(cppobj)
 
     def _children(self):
@@ -232,7 +234,8 @@ class CppExpression(CppEntity):
     def __init__(self, scope, parent, name, result, paren = False):
         CppEntity.__init__(self, scope, parent)
         self.name = name
-        self.result = result
+        self.full_type = result
+        self.result = result[6:] if result.startswith("const ") else result
         self.parenthesis = paren
 
     LITERALS = (int, long, float, bool, basestring)
@@ -853,6 +856,8 @@ class CppExpressionBuilder(CppEntityBuilder):
                     elif cursor.kind == CK.MEMBER_REF_EXPR \
                             and cursor.spelling == self.name:
                         children = list(cursor.get_children())
+                        if not children:
+                            continue
                         builders.append(CppExpressionBuilder(children[0],
                                         self.scope, cppobj,
                                         insert = cppobj._set_method))
