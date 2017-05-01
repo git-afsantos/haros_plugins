@@ -121,6 +121,7 @@ class ResourceGraph(object):
         name = resource.full_name
         resource.full_name = self.remaps.get(name, name)
         name = resource.full_name
+        resource.namespace = name.rsplit("/", 1)[0]
         if name in self.resources:
             if not name in self.collisions:
                 self.collisions[name] = []
