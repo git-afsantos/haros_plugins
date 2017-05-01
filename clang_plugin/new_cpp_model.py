@@ -1377,7 +1377,9 @@ class AnalysisData(object):
             cppobj._definition = previous
             return
         if not declaration and not previous is None:
-            cppobj.references.extend(previous.references)
+            for ref in previous.references:
+                cppobj.references.append(ref)
+                ref.reference = cppobj
             previous.references = []
             if isinstance(cppobj, CppFunction):
                 previous._definition = cppobj
