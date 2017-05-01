@@ -164,9 +164,10 @@ class CppFunction(CppEntity, CppStatementGroup):
 
     def _afterpass(self):
         fi = 0
-        for cppobj in self._children():
+        for cppobj in self.walk_preorder():
             cppobj._fi = fi
             fi += 1
+        del self._fi
 
 
     def pretty_str(self, indent = 0):
