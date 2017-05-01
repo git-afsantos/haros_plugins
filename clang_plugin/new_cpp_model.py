@@ -151,6 +151,7 @@ class CppFunction(CppEntity, CppStatementGroup):
         self.parameters = []
         self.body = CppBlock(self, self, explicit = True)
         self.references = []
+        self._definition = self
 
     def _add(self, cppobj):
         assert isinstance(cppobj, (CppStatement, CppExpression))
@@ -175,7 +176,10 @@ class CppFunction(CppEntity, CppStatementGroup):
         params = ", ".join(map(lambda p: p.result + " " + p.name,
                             self.parameters))
         pretty = "{}{} {}({}):\n".format(spaces, self.result, self.name, params)
-        pretty += self.body.pretty_str(indent + 2)
+        if not self._definition is self:
+            pretty += spaces + "  [declaration]"
+        else:
+            pretty += self.body.pretty_str(indent + 2)
         return pretty
 
     def __repr__(self):
@@ -1246,8 +1250,8 @@ class CppTopLevelBuilder(CppEntityBuilder):
             result = self.cursor.result_type.spelling
             cppobj = CppFunction(self.scope, self.parent, id,
                                  self.name, result)
-            data.register(cppobj)
             builders = []
+            declaration = True
             children = self.cursor.get_children()
             cursor = next(children, None)
             while cursor:
@@ -1260,6 +1264,7 @@ class CppTopLevelBuilder(CppEntityBuilder):
                     cppobj.parameters.append(var)
                 elif cursor.kind == CK.MEMBER_REF:
                     # This is for constructors, we need the sibling
+                    declaration = False
                     result  = cursor.type.spelling or "[type]"
                     stmt    = CppOperator(cppobj, cppobj, "=", result)
                     member  = CppExpressionBuilder(cursor, cppobj, stmt)
@@ -1269,9 +1274,11 @@ class CppTopLevelBuilder(CppEntityBuilder):
                     builders.append(member)
                     builders.append(value)
                 elif cursor.kind == CK.COMPOUND_STMT:
+                    declaration = False
                     for c in cursor.get_children():
                         builders.append(CppStatementBuilder(c, cppobj, cppobj))
                 cursor = next(children, None)
+            data.register(cppobj, declaration = declaration)
             return (cppobj, builders)
         return None
 
@@ -1364,7 +1371,16 @@ class AnalysisData(object):
         self.entities   = {}    # USR -> CppEntity
         self._refs      = {}    # USR -> [CppEntity]
 
-    def register(self, cppobj):
+    def register(self, cppobj, declaration = False):
+        previous = self.entities.get(cppobj.id)
+        if declaration and not previous is None:
+            cppobj._definition = previous
+            return
+        if not declaration and not previous is None:
+            cppobj.references.extend(previous.references)
+            previous.references = []
+            if isinstance(cppobj, CppFunction):
+                previous._definition = cppobj
         self.entities[cppobj.id] = cppobj
         if cppobj.id in self._refs:
             for ref in self._refs[cppobj.id]:
@@ -1477,7 +1493,8 @@ class CppAstParser(object):
         if translation_unit.diagnostics:
             for diagnostic in translation_unit.diagnostics:
                 if diagnostic.severity >= clang.Diagnostic.Error:
-                    logging.warning(diagnostic.spelling)
+                    # logging.warning(diagnostic.spelling)
+                    print "WARNING", diagnostic.spelling
 
 
 ###############################################################################
@@ -1513,6 +1530,7 @@ def resolve_reference(reference):
                 return resolve_reference(arg)
             return arg
         return var.value
+    return reference.reference
 
 
 ###############################################################################
@@ -1541,24 +1559,12 @@ def pretty_str(something, indent = 0):
 
 if __name__ == "__main__":
     CppAstParser.set_library_path()
-    CppAstParser.set_database("/home/andre/catkin_ws/build")
+    #CppAstParser.set_database("/home/andre/catkin_ws/build")
     parser = CppAstParser(workspace = "/home/andre/")
-    #parser.parse("/home/andre/cpp/subscriber_example.cpp")
-    parser.parse("/home/andre/catkin_ws/turtlebot/kobuki/kobuki_safety_controller/src/nodelet.cpp")
+    parser.parse("/home/andre/cpp/class_example.cpp")
     print parser.global_scope.pretty_str()
     print "\n----------------------------------\n"
     for cppobj in (CppQuery(parser.global_scope).all_calls
-                   .where_name(("advertise", "subscribe")).get()):
+                   .where_name("m").get()):
         print cppobj.pretty_str()
-        topic = cppobj.arguments[0]
-        """
-        cppobj = cppobj.method_of.reference.value
-        print cppobj
-        if len(cppobj.arguments) == 2:
-            if isinstance(cppobj.arguments, basestring):
-                print "topic", "<namespace>/" + cppobj.arguments[0] + "/" + topic
-            elif isinstance(cppobj.arguments[0], CppDefaultArgument):
-                print "topic", "<namespace>/" + topic
-            else:
-                print "this is not the default constructor"
-        """
+        print cppobj.reference.pretty_str()
