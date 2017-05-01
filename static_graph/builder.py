@@ -255,6 +255,13 @@ class ConfigurationBuilder(object):
                             ns = value
                         elif isinstance(value, CppDefaultArgument):
                             ns = ""
+                    elif len(value.arguments) == 1:
+                        value = value.arguments[0]
+                        if isinstance(value, CppFunctionCall):
+                            if value.name == "getNodeHandle":
+                                ns = ""
+                            elif value.name == "getPrivateNodeHandle":
+                                ns = "~"
                 elif value.name == "getNodeHandle":
                     ns = ""
                 elif value.name == "getPrivateNodeHandle":
