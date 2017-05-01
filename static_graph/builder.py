@@ -6,7 +6,9 @@ import os
 ###
 # internal packages
 import haros_util.ros_model as ROS
-from clang_plugin.new_cpp_model import CppAstParser, CppQuery
+from clang_plugin.new_cpp_model import CppAstParser, CppQuery, \
+                                        CppFunctionCall, CppDefaultArgument, \
+                                        resolve_reference
 from cmake_analyser.analyser import CMakeAnalyser
 from launch_analyser.analyser import LaunchFileAnalyser
 
@@ -25,12 +27,19 @@ MAGICK_INCLUDE  = "/usr/include/ImageMagick"
 ###############################################################################
 
 class TopicGenerator(object):
-    def __init__(self, name, method):
+    def __init__(self, name, namespace, method):
+        if namespace:
+            if namespace[-1].isalpha():
+                name = namespace + "/" + name
+            else:
+                name = namespace + name
         self.name       = name
+        self.namespace  = namespace
         self.publisher  = method == "advertise"
 
     def generate(self, node, resources):
-        name = ROS.resolve_name(self.name, ns = node.namespace)
+        name = ROS.resolve_name(self.name, ns = node.namespace,
+                                private_ns = node.full_name)
         topic = resources.get_topic(name, remap = True)
         if topic is None:
             topic = ROS.Topic(name)
@@ -45,12 +54,19 @@ class TopicGenerator(object):
 
 
 class ServiceGenerator(object):
-    def __init__(self, name, method):
-        self.name   = name
-        self.server = method == "advertiseService"
+    def __init__(self, name, namespace, method):
+        if namespace:
+            if namespace[-1].isalpha():
+                name = namespace + "/" + name
+            else:
+                name = namespace + name
+        self.name       = name
+        self.namespace  = namespace
+        self.server     = method == "advertiseService"
 
     def generate(self, node, resources):
-        name = ROS.resolve_name(self.name, ns = node.namespace)
+        name = ROS.resolve_name(self.name, ns = node.namespace,
+                                private_ns = node.full_name)
         service = resources.get_service(name, remap = True)
         if service is None:
             service = ROS.Service(name)
@@ -223,4 +239,24 @@ class ConfigurationBuilder(object):
         if len(call.arguments) > 1:
             topic = call.arguments[0]
             if isinstance(topic, basestring):
-                self._gen_entry.append(generator(topic, call.name))
+                ns = self._resolve_node_handle(call)
+                self._gen_entry.append(generator(topic, ns, call.name))
+
+
+    def _resolve_node_handle(self, call):
+        ns = "?/"
+        value = resolve_reference(call.method_of) if call.method_of else None
+        if not value is None:
+            if isinstance(value, CppFunctionCall):
+                if value.name == "NodeHandle":
+                    if len(value.arguments) == 2:
+                        value = value.arguments[0]
+                        if isinstance(value, basestring):
+                            ns = value
+                        elif isinstance(value, CppDefaultArgument):
+                            ns = ""
+                elif value.name == "getNodeHandle":
+                    ns = ""
+                elif value.name == "getPrivateNodeHandle":
+                    ns = "~"
+        return ns
