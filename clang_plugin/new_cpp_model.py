@@ -164,11 +164,12 @@ class CppFunction(CppEntity, CppStatementGroup):
             yield cppobj
 
     def _afterpass(self):
+        if hasattr(self, "_fi"):
+            return
         fi = 0
         for cppobj in self.walk_preorder():
             cppobj._fi = fi
             fi += 1
-        del self._fi
 
 
     def pretty_str(self, indent = 0):
@@ -906,7 +907,7 @@ class CppExpressionBuilder(CppEntityBuilder):
                     if cppobj.is_constructor:
                         cppobj.full_name = cppobj.result + "::" + cppobj.name
     # -------------------------------------------------------------------------
-                ref = self.cursor.get_definition()
+                ref = self.cursor.get_definition() or self.cursor.referenced
                 if ref:
                     data.reference(ref.get_usr(), cppobj)
                 builders = []
