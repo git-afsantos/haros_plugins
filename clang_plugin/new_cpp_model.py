@@ -60,6 +60,12 @@ class CppEntity(object):
         return
         yield
 
+    def _lookup_parent(self, cls):
+        cppobj = self.parent
+        while not cppobj is None and not isinstance(cppobj, cls):
+            cppobj = cppobj.parent
+        return cppobj
+
 
     def pretty_str(self, indent = 0):
         return (" " * indent) + self.__str__()
@@ -96,6 +102,26 @@ class CppVariable(CppEntity):
         self.result = result[6:] if result.startswith("const ") else result
         self.value = None
         self.references = []
+
+    @property
+    def is_local(self):
+        return (isinstance(self.scope, CppStatement)
+                or (isinstance(self.scope, CppFunction)
+                    and not self in self.scope.parameters))
+
+    @property
+    def is_global(self):
+        return isinstance(self.scope, (CppGlobalScope, CppNamespace))
+
+    @property
+    def is_parameter(self):
+        return (isinstance(self.scope, CppFunction)
+                and self in self.scope.parameters)
+
+    @property
+    def is_member(self):
+        return isinstance(self.scope, CppClass)
+
 
     def _add(self, cppobj):
         assert isinstance(cppobj, CppExpression.TYPES)
@@ -136,6 +162,12 @@ class CppFunction(CppEntity, CppStatementGroup):
         for cppobj in self.body._children():
             yield cppobj
 
+    def _afterpass(self):
+        fi = 0
+        for cppobj in self._children():
+            cppobj._fi = fi
+            fi += 1
+
 
     def pretty_str(self, indent = 0):
         spaces = " " * indent
@@ -167,6 +199,12 @@ class CppClass(CppEntity):
         for cppobj in self.members:
             yield cppobj
 
+    def _afterpass(self):
+        for cppobj in self.members:
+            if isinstance(cppobj, CppVariable):
+                continue
+            cppobj._afterpass()
+
 
     def pretty_str(self, indent = 0):
         spaces = " " * indent
@@ -197,6 +235,12 @@ class CppNamespace(CppEntity):
         for cppobj in self.children:
             yield cppobj
 
+    def _afterpass(self):
+        for cppobj in self.children:
+            if isinstance(cppobj, CppVariable):
+                continue
+            cppobj._afterpass()
+
 
     def pretty_str(self, indent = 0):
         spaces = " " * indent
@@ -221,6 +265,12 @@ class CppGlobalScope(CppEntity):
     def _children(self):
         for cppobj in self.children:
             yield cppobj
+
+    def _afterpass(self):
+        for cppobj in self.children:
+            if isinstance(cppobj, CppVariable):
+                continue
+            cppobj._afterpass()
 
 
     def pretty_str(self, indent = 0):
@@ -306,6 +356,13 @@ class CppOperator(CppExpression):
     @property
     def is_binary(self):
         return len(self.arguments) == 2
+
+    @property
+    def is_assignment(self):
+        return (self.name == "=" or self.name == "+=" or self.name == "-="
+                or self.name == "*=" or self.name == "/=" or self.name == "%="
+                or self.name == "&=" or self.name == "|=" or self.name == "^="
+                or self.name == "<<=" or self.name == ">>=")
 
     def _add(self, cppobj):
         assert isinstance(cppobj, CppExpression.TYPES)
@@ -1380,6 +1437,7 @@ class CppAstParser(object):
                 unit = self._index.parse(None, args)
                 self._check_compilation_problems(unit)
                 self._ast_analysis(unit.cursor)
+        self.global_scope._afterpass()
         return self.global_scope
 
     def _parse_without_db(self, file_path):
@@ -1392,6 +1450,7 @@ class CppAstParser(object):
             unit = self._index.parse(None, args)
             self._check_compilation_problems(unit)
             self._ast_analysis(unit.cursor)
+        self.global_scope._afterpass()
         return self.global_scope
 
     def _ast_analysis(self, top_cursor):
@@ -1418,6 +1477,41 @@ class CppAstParser(object):
             for diagnostic in translation_unit.diagnostics:
                 if diagnostic.severity >= clang.Diagnostic.Error:
                     logging.warning(diagnostic.spelling)
+
+
+###############################################################################
+# Interface Functions
+###############################################################################
+
+def resolve_reference(reference):
+    assert isinstance(reference, CppReference)
+    fi = reference._fi
+    if (reference.reference is None
+            or isinstance(reference.reference, basestring)):
+        return None
+    if isinstance(reference.reference, CppVariable):
+        var = reference.reference
+        if var.is_local:
+            value = var.value
+            for other in var.references:
+                if other._fi < reference._fi:
+                    if (isinstance(other.parent, CppOperator)
+                            and other.parent.is_assignment
+                            and other is other.parent.arguments[0]):
+                        return None
+            return var.value
+        if var.is_parameter:
+            function = var.scope
+            calls = [call for call in function.references \
+                          if isinstance(call, CppFunctionCall)]
+            if len(calls) != 1:
+                return None
+            i = function.parameters.index(var)
+            arg = calls[0].arguments[i]
+            if isinstance(arg, CppReference):
+                return resolve_reference(arg)
+            return arg
+        return var.value
 
 
 ###############################################################################
