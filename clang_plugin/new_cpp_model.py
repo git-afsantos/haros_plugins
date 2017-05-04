@@ -307,6 +307,16 @@ class CppExpression(CppEntity):
 CppExpression.TYPES = (int, long, float, bool, basestring, CppExpression)
 
 
+class SomeCpp(CppExpression):
+    def __init__(self, result):
+        CppExpression.__init__(self, None, None, result, result)
+
+SomeCpp.INTEGER = SomeCpp("int")
+SomeCpp.FLOATING = SomeCpp("float")
+SomeCpp.CHARACTER = SomeCpp("char")
+SomeCpp.BOOL = SomeCpp("bool")
+
+
 class CppReference(CppExpression):
     def __init__(self, scope, parent, name, result):
         CppExpression.__init__(self, scope, parent, name, result)
@@ -399,9 +409,10 @@ class CppOperator(CppExpression):
         if self.is_unary:
             return "[{}] {}({})".format(self.result, self.name,
                                         self.arguments[0])
-        else:
+        elif self.is_binary:
             return "[{}] ({}){}({})".format(self.result, self.arguments[0],
                                             self.name, self.arguments[1])
+        return "[{}] {}".format(self.result, self.name)
 
 
 class CppFunctionCall(CppExpression):
@@ -676,7 +687,8 @@ class CppLoop(CppControlFlow):
         self.increment = None
 
     def _set_declarations(self, declarations):
-        assert isinstance(declarations, CppDeclaration)
+        assert isinstance(declarations,
+                          (CppDeclaration, CppOperator, CppFunctionCall))
         self.declarations = declarations
         declarations.scope = self.body
 
@@ -824,17 +836,18 @@ class CppExpressionBuilder(CppEntityBuilder):
                 while token.endswith(("U", "u", "L", "l")):
                     token = token[:-1]
                 return (int(token, 0), ())
-            return None
+            return (SomeCpp.INTEGER, ())
         if self.cursor.kind == CK.FLOATING_LITERAL:
             if token:
                 if token.spelling[-1].isalpha():
                     return (float(token.spelling[:-1]), ())
                 return (float(token.spelling), ())
-            return None
+            return (SomeCpp.FLOATING, ())
         if self.cursor.kind == CK.CHARACTER_LITERAL:
-            return (token.spelling, ()) if token else None
+            return (token.spelling, ()) if token else (SomeCpp.CHARACTER, ())
         if self.cursor.kind == CK.CXX_BOOL_LITERAL_EXPR:
-            return (token.spelling == "true", ()) if token else None
+            return (token.spelling == "true", ()) if token \
+                                                  else (SomeCpp.BOOL, ())
         if self.cursor.kind == CK.CALL_EXPR and self.name == "basic_string":
             cursor = next(self.cursor.get_children(), None)
             if not cursor:
@@ -893,6 +906,9 @@ class CppExpressionBuilder(CppEntityBuilder):
         return None
 
     def _build_function_call(self, data):
+        if self.cursor.kind == CK.CXX_NEW_EXPR:
+            self.cursor = list(self.cursor.get_children())[-1]
+            self.name = self.cursor.spelling
         # NOTE: this is not totally correct, needs revision
         if self.cursor.kind == CK.CALL_EXPR:
             if self.name:
@@ -937,12 +953,24 @@ class CppExpressionBuilder(CppEntityBuilder):
                                         self.scope, cppobj))
                 return (cppobj, builders)
             else:
-                original    = self.cursor
-                self.cursor = next(self.cursor.get_children(), None)
-                self.name   = self.cursor.spelling
-                result      = self.build(data)
-                self.cursor = original
+                cursor = next(self.cursor.get_children(), None)
+                if not cursor is None:
+                    original    = self.cursor
+                    self.cursor = cursor
+                    self.name   = cursor.spelling
+                    result      = self.build(data)
+                    self.cursor = original
+                elif isinstance(self.parent, CppVariable):
+                    self.name   = self.result.split(":")[-1]
+                    result      = self._build_function_call(data)
                 return result
+        elif self.cursor.kind == CK.CXX_DELETE_EXPR:
+            cppobj = CppFunctionCall(self.scope, self.parent,
+                                     "delete", self.result)
+            cppobj.parenthesis = self.parenthesis
+            ref = next(self.cursor.get_children())
+            builder = CppExpressionBuilder(ref, self.scope, cppobj)
+            return (cppobj, (builder,))
         return None
 
     def _build_default_argument(self):
