@@ -1556,6 +1556,8 @@ def resolve_reference(reference):
             if len(calls) != 1:
                 return None
             i = function.parameters.index(var)
+            if len(calls[0].arguments) <= i:
+                return None
             arg = calls[0].arguments[i]
             if isinstance(arg, CppReference):
                 return resolve_reference(arg)
