@@ -953,6 +953,7 @@ class CppExpressionBuilder(CppEntityBuilder):
                                         self.scope, cppobj))
                 return (cppobj, builders)
             else:
+                result = None
                 cursor = next(self.cursor.get_children(), None)
                 if not cursor is None:
                     original    = self.cursor
