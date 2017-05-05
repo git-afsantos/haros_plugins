@@ -119,8 +119,11 @@ class ResourceGraph(object):
 
     def register(self, resource):
         name = resource.full_name
-        resource.full_name = self.remaps.get(name, name)
-        name = resource.full_name
+        remap = self.remaps.get(name)
+        while not remap is None:
+            name = remap
+            remap = self.remaps.get(name)
+        resource.full_name = name
         resource.namespace = name.rsplit("/", 1)[0]
         if name in self.resources:
             if not name in self.collisions:
