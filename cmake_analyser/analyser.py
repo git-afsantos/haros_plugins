@@ -209,6 +209,8 @@ class CMakeAnalyser(object):
         flags = ("STATIC", "SHARED", "MODULE", "UNKNOWN", "EXCLUDE_FROM_ALL")
         while args[i] in flags:
             i += 1
+            if i >= n:
+                return
         if args[i] in ("IMPORTED", "ALIAS", "OBJECT", "INTERFACE"):
             return # TODO
         target = BuildTarget.new_target(name, args[i:], self.directory, False)
@@ -449,13 +451,13 @@ class CMakeAnalyser(object):
                    or arg in self.data["executables"] \
                    else "FALSE"
         if test == "EXISTS":
-            return "TRUE" if os.path.exists(args[i]) else "FALSE"
+            return "TRUE" if os.path.exists(arg) else "FALSE"
         if test == "IS_DIRECTORY":
-            return "TRUE" if os.path.isdir(args[i]) else "FALSE"
+            return "TRUE" if os.path.isdir(arg) else "FALSE"
         if test == "IS_SYMLINK":
-            return "TRUE" if os.path.islink(args[i]) else "FALSE"
+            return "TRUE" if os.path.islink(arg) else "FALSE"
         if test == "IS_ABSOLUTE":
-            return "TRUE" if os.path.isabs(args[i]) else "FALSE"
+            return "TRUE" if os.path.isabs(arg) else "FALSE"
         # TODO COMMAND and POLICY
         return "FALSE"
 
