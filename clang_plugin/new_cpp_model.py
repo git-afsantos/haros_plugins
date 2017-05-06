@@ -101,7 +101,9 @@ class CppVariable(CppEntity):
         self.full_type = result
         self.result = result[6:] if result.startswith("const ") else result
         self.value = None
+        self.member_of = None
         self.references = []
+        self.writes = []
 
     @property
     def is_local(self):
@@ -150,8 +152,17 @@ class CppFunction(CppEntity, CppStatementGroup):
         self.result = result[6:] if result.startswith("const ") else result
         self.parameters = []
         self.body = CppBlock(self, self, explicit = True)
+        self.member_of = None
         self.references = []
         self._definition = self
+
+    @property
+    def is_definition(self):
+        return self._definition is self
+
+    @property
+    def is_constructor(self):
+        return self.member_of and self.name == self.member_of.name
 
     def _add(self, cppobj):
         assert isinstance(cppobj, (CppStatement, CppExpression))
@@ -170,13 +181,22 @@ class CppFunction(CppEntity, CppStatementGroup):
         for cppobj in self.walk_preorder():
             cppobj._fi = fi
             fi += 1
+            if isinstance(cppobj, CppOperator) and cppobj.is_assignment:
+                if cppobj.arguments:
+                    var = cppobj.arguments[0].reference
+                    if not var is None:
+                        var.writes.append(cppobj.statement)
 
 
     def pretty_str(self, indent = 0):
         spaces = " " * indent
         params = ", ".join(map(lambda p: p.result + " " + p.name,
                             self.parameters))
-        pretty = "{}{} {}({}):\n".format(spaces, self.result, self.name, params)
+        if self.is_constructor:
+            pretty = "{}{}({}):\n".format(spaces, self.name, params)
+        else:
+            pretty = "{}{} {}({}):\n".format(spaces, self.result,
+                                             self.name, params)
         if not self._definition is self:
             pretty += spaces + "  [declaration]"
         else:
@@ -195,11 +215,18 @@ class CppClass(CppEntity):
         self.name = name
         self.members = []
         self.superclasses = []
+        self.member_of = None
         self.references = []
+        self._definition = self
+
+    @property
+    def is_definition(self):
+        return True # TODO
 
     def _add(self, cppobj):
         assert isinstance(cppobj, (CppFunction, CppVariable, CppClass))
         self.members.append(cppobj)
+        cppobj.member_of = self
 
     def _children(self):
         for cppobj in self.members:
@@ -209,6 +236,8 @@ class CppClass(CppEntity):
         for cppobj in self.members:
             if isinstance(cppobj, CppVariable):
                 continue
+            if not cppobj.is_definition:
+                cppobj._definition.member_of = self
             cppobj._afterpass()
 
 
@@ -296,6 +325,14 @@ class CppExpression(CppEntity):
 
     LITERALS = (int, long, float, bool, basestring)
 
+    @property
+    def function(self):
+        return self._lookup_parent(CppFunction)
+
+    @property
+    def statement(self):
+        return self._lookup_parent(CppStatement)
+
     def pretty_str(self, indent = 0):
         if self.parenthesis:
             return (" " * indent) + "(" + self.name + ")"
@@ -303,8 +340,6 @@ class CppExpression(CppEntity):
 
     def __repr__(self):
         return "[{}] {}".format(self.result, self.name)
-
-CppExpression.TYPES = (int, long, float, bool, basestring, CppExpression)
 
 
 class SomeCpp(CppExpression):
@@ -315,6 +350,10 @@ SomeCpp.INTEGER = SomeCpp("int")
 SomeCpp.FLOATING = SomeCpp("float")
 SomeCpp.CHARACTER = SomeCpp("char")
 SomeCpp.BOOL = SomeCpp("bool")
+
+
+CppExpression.TYPES = (int, long, float, bool,
+                       basestring, SomeCpp, CppExpression)
 
 
 class CppReference(CppExpression):
@@ -426,7 +465,10 @@ class CppFunctionCall(CppExpression):
 
     @property
     def is_constructor(self):
-        return self.result.split("::")[-1] == self.name
+        result = self.result.split("::")[-1]
+        if result.endswith(" *"):
+            result = result[:-2]
+        return result == self.name
 
     def _add(self, cppobj):
         assert isinstance(cppobj, CppExpression.TYPES)
@@ -464,6 +506,8 @@ class CppFunctionCall(CppExpression):
                 else:
                     call = "{}.{}{}({})".format(o.pretty_str(),
                                                 self.name, temp, args)
+            elif self.is_constructor:
+                call = "new {}{}({})".format(self.name, temp, args)
             else:
                 call = "{}{}({})".format(self.name, temp, args)
         return pretty.format(indent, call)
@@ -488,6 +532,11 @@ class CppDefaultArgument(CppExpression):
 class CppStatement(CppEntity):
     def __init__(self, scope, parent):
         CppEntity.__init__(self, scope, parent)
+        self._si = -1
+
+    @property
+    def function(self):
+        return self._lookup_parent(CppFunction)
 
 
 class CppJumpStatement(CppStatement):
@@ -517,6 +566,22 @@ class CppJumpStatement(CppStatement):
         return self.name
 
 
+class CppExpressionStatement(CppStatement):
+    def __init__(self, scope, parent, expression = None):
+        CppStatement.__init__(self, scope, parent)
+        self.expression = expression
+
+    def _children(self):
+        if isinstance(self.expression, CppExpression):
+            yield self.expression
+
+    def pretty_str(self, indent = 0):
+        return pretty_str(self.expression, indent = indent)
+
+    def __repr__(self):
+        return repr(self.expression)
+
+
 class CppBlock(CppStatement, CppStatementGroup):
     def __init__(self, scope, parent, explicit = True):
         CppStatement.__init__(self, scope, parent)
@@ -527,7 +592,7 @@ class CppBlock(CppStatement, CppStatementGroup):
         return self.body[i]
 
     def _add(self, cppobj):
-        assert isinstance(cppobj, (CppStatement, CppExpression))
+        assert isinstance(cppobj, CppStatement)
         cppobj._si = len(self.body)
         self.body.append(cppobj)
 
@@ -579,11 +644,11 @@ class CppControlFlow(CppStatement, CppStatementGroup):
         return [(self.condition, self.body)]
 
     def _set_condition(self, condition):
-        assert isinstance(condition, (int, long, float, bool, CppExpression))
+        assert isinstance(condition, CppExpression.TYPES)
         self.condition = condition
 
     def _set_body(self, body):
-        assert isinstance(body, (CppStatement, CppExpression))
+        assert isinstance(body, CppStatement)
         if isinstance(body, CppBlock):
             self.body = body
         else:
@@ -651,7 +716,7 @@ class CppConditional(CppControlFlow):
         return [self.then_branch]
 
     def _add_default_branch(self, body):
-        assert isinstance(body, (CppStatement, CppExpression))
+        assert isinstance(body, CppStatement)
         if isinstance(body, CppBlock):
             self.else_body = body
         else:
@@ -693,7 +758,7 @@ class CppLoop(CppControlFlow):
         declarations.scope = self.body
 
     def _set_increment(self, statement):
-        assert isinstance(statement, (CppStatement, CppExpression))
+        assert isinstance(statement, CppStatement)
         self.increment = statement
         statement.scope = self.body
 
@@ -1057,7 +1122,15 @@ class CppStatementBuilder(CppEntityBuilder):
 
     def _build_expression(self, data):
         builder = CppExpressionBuilder(self.cursor, self.scope, self.parent)
-        return builder.build(data)
+        result = builder.build(data)
+        if result:
+            expression = result[0]
+            cppobj = CppExpressionStatement(self.scope, self.parent,
+                                            expression = expression)
+            if isinstance(expression, CppExpression):
+                expression.parent = cppobj
+            result = (cppobj, result[1])
+        return result
 
     def _build_declarations(self, data):
         if self.cursor.kind == CK.DECL_STMT:
@@ -1296,10 +1369,12 @@ class CppTopLevelBuilder(CppEntityBuilder):
                     # This is for constructors, we need the sibling
                     declaration = False
                     result  = cursor.type.spelling or "[type]"
-                    stmt    = CppOperator(cppobj, cppobj, "=", result)
-                    member  = CppExpressionBuilder(cursor, cppobj, stmt)
+                    op      = CppOperator(cppobj, cppobj, "=", result)
+                    member  = CppExpressionBuilder(cursor, cppobj, op)
                     cursor  = next(children)
-                    value   = CppExpressionBuilder(cursor, cppobj, stmt)
+                    value   = CppExpressionBuilder(cursor, cppobj, op)
+                    stmt    = CppExpressionStatement(cppobj, cppobj, op)
+                    op.parent = stmt
                     cppobj._add(stmt)
                     builders.append(member)
                     builders.append(value)
@@ -1533,25 +1608,68 @@ class CppAstParser(object):
 # Interface Functions
 ###############################################################################
 
+def resolve_expression(expression):
+    assert isinstance(expression, CppExpression.TYPES)
+    if isinstance(expression, CppReference):
+        return resolve_reference(expression)
+    if isinstance(expression, CppOperator):
+        args = []
+        for arg in expression.arguments:
+            arg = resolve_expression(arg)
+            if not isinstance(arg, CppExpression.LITERALS):
+                return expression
+            args.append(arg)
+        if expression.is_binary:
+            a = args[0]
+            b = args[1]
+            if not isinstance(a, CppExpression.LITERALS) \
+                    or not isinstance(b, CppExpression.LITERALS):
+                return expression
+            if expression.name == "+":
+                return a + b
+            if expression.name == "-":
+                return a - b
+            if expression.name == "*":
+                return a * b
+            if expression.name == "/":
+                return a / b
+            if expression.name == "%":
+                return a % b
+    # if isinstance(expression, CppExpression.LITERALS):
+    # if isinstance(expression, SomeCpp):
+    # if isinstance(expression, CppFunctionCall):
+    # if isinstance(expression, CppDefaultArgument):
+    return expression
+
+
 def resolve_reference(reference):
     assert isinstance(reference, CppReference)
-    fi = reference._fi
+    si = reference.statement._si
     if (reference.reference is None
             or isinstance(reference.reference, basestring)):
         return None
     if isinstance(reference.reference, CppVariable):
         var = reference.reference
-        if var.is_local:
-            value = var.value
-            for other in var.references:
-                if other._fi < reference._fi:
-                    if (isinstance(other.parent, CppOperator)
-                            and other.parent.is_assignment
-                            and other is other.parent.arguments[0]):
-                        return None
-            return var.value
-        if var.is_parameter:
-            function = var.scope
+        value = var.value
+        function = reference.function
+        for w in var.writes:
+            if not w.function is function:
+                continue
+            if w._si < si:
+                if isinstance(w.expression, CppOperator) \
+                        and w.expression.is_assignment \
+                        and w.expression.arguments[0].reference is var:
+                    value = resolve_expression(w.expression.arguments[1])
+                else:
+                    continue # TODO
+            elif w._si == si:
+                if isinstance(w.expression, CppOperator) \
+                        and w.expression.is_assignment \
+                        and w.expression.arguments[0] is reference:
+                    value = resolve_expression(w.expression.arguments[1])
+                else:
+                    continue # TODO
+        if value is None and var.is_parameter:
             calls = [call for call in function.references \
                           if isinstance(call, CppFunctionCall)]
             if len(calls) != 1:
@@ -1563,7 +1681,7 @@ def resolve_reference(reference):
             if isinstance(arg, CppReference):
                 return resolve_reference(arg)
             return arg
-        return var.value
+        return value
     return reference.reference
 
 
@@ -1598,7 +1716,7 @@ if __name__ == "__main__":
     parser.parse("/home/andre/cpp/class_example.cpp")
     print parser.global_scope.pretty_str()
     print "\n----------------------------------\n"
-    for cppobj in (CppQuery(parser.global_scope).all_calls
-                   .where_name("m").get()):
-        print cppobj.pretty_str()
-        print cppobj.reference.pretty_str()
+    for cppobj in (CppQuery(parser.global_scope).all_references
+                   .where_name("a").get()):
+        print cppobj.statement.pretty_str()
+        print pretty_str(resolve_reference(cppobj))
