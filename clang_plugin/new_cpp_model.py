@@ -182,7 +182,8 @@ class CppFunction(CppEntity, CppStatementGroup):
             cppobj._fi = fi
             fi += 1
             if isinstance(cppobj, CppOperator) and cppobj.is_assignment:
-                if cppobj.arguments:
+                if cppobj.arguments and isinstance(cppobj.arguments[0],
+                                                   CppReference):
                     var = cppobj.arguments[0].reference
                     if isinstance(var, CppVariable):
                         var.writes.append(cppobj.statement)
