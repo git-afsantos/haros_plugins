@@ -184,7 +184,7 @@ class CppFunction(CppEntity, CppStatementGroup):
             if isinstance(cppobj, CppOperator) and cppobj.is_assignment:
                 if cppobj.arguments:
                     var = cppobj.arguments[0].reference
-                    if not var is None:
+                    if isinstance(var, CppVariable):
                         var.writes.append(cppobj.statement)
 
 
