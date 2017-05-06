@@ -184,6 +184,10 @@ class CppFunction(CppEntity, CppStatementGroup):
             if isinstance(cppobj, CppOperator) and cppobj.is_assignment:
                 if cppobj.arguments and isinstance(cppobj.arguments[0],
                                                    CppReference):
+                    # left side can be CALL_EXPR: operator[] or operator()
+                    # or ARRAY_SUBSCRIPT_EXPR: a[]
+                    # or UNARY_OPERATOR: *a
+                    # or PAREN_EXPR: (*a)
                     var = cppobj.arguments[0].reference
                     if isinstance(var, CppVariable):
                         var.writes.append(cppobj.statement)
@@ -1644,6 +1648,8 @@ def resolve_expression(expression):
 
 def resolve_reference(reference):
     assert isinstance(reference, CppReference)
+    if reference.statement is None:
+        return None # TODO investigate
     si = reference.statement._si
     if (reference.reference is None
             or isinstance(reference.reference, basestring)):
