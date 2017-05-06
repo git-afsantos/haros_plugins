@@ -752,8 +752,7 @@ class CppLoop(CppControlFlow):
         self.increment = None
 
     def _set_declarations(self, declarations):
-        assert isinstance(declarations,
-                          (CppDeclaration, CppOperator, CppFunctionCall))
+        assert isinstance(declarations, CppStatement)
         self.declarations = declarations
         declarations.scope = self.body
 
