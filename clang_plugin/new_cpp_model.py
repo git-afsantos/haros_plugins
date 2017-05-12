@@ -190,7 +190,7 @@ class CppFunction(CppEntity, CppStatementGroup):
                     # or PAREN_EXPR: (*a)
                     var = cppobj.arguments[0].reference
                     if isinstance(var, CppVariable):
-                        var.writes.append(cppobj.statement)
+                        var.writes.append(cppobj)
 
 
     def pretty_str(self, indent = 0):
@@ -1140,6 +1140,7 @@ class CppStatementBuilder(CppEntityBuilder):
         if self.cursor.kind == CK.DECL_STMT:
             cppobj = CppDeclaration(self.scope, self.parent)
             original = self.cursor
+            self.parent = cppobj
             builders = []
             for cursor in original.get_children():
                 self.cursor = cursor
@@ -1148,6 +1149,7 @@ class CppStatementBuilder(CppEntityBuilder):
                     cppobj._add(result[0])
                     builders.extend(result[1])
             self.cursor = original
+            self.parent = cppobj.parent
             return (cppobj, builders)
         return None
 
@@ -1659,20 +1661,17 @@ def resolve_reference(reference):
         value = var.value
         function = reference.function
         for w in var.writes:
+            ws = w.statement
             if not w.function is function:
                 continue
-            if w._si < si:
-                if isinstance(w.expression, CppOperator) \
-                        and w.expression.is_assignment \
-                        and w.expression.arguments[0].reference is var:
-                    value = resolve_expression(w.expression.arguments[1])
+            if ws._si < si:
+                if w.arguments[0].reference is var:
+                    value = resolve_expression(w.arguments[1])
                 else:
                     continue # TODO
-            elif w._si == si:
-                if isinstance(w.expression, CppOperator) \
-                        and w.expression.is_assignment \
-                        and w.expression.arguments[0] is reference:
-                    value = resolve_expression(w.expression.arguments[1])
+            elif ws._si == si:
+                if w.arguments[0] is reference:
+                    value = resolve_expression(w.arguments[1])
                 else:
                     continue # TODO
         if value is None and var.is_parameter:
