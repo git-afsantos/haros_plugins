@@ -179,6 +179,21 @@ def resolve_name(name, ns = "/", private_ns = ""):
         return ns + name
 
 
+def apply_remaps(name, remaps):
+    remap = remaps.get(name)
+    while not remap is None:
+        name = remap
+        remap = remaps.get(name)
+    return name
+
+
+def transform_name(name, ns = "/", private_ns = "", remaps = None):
+    name = resolve_name(name, ns = ns, private_ns = private_ns)
+    if remaps:
+        return apply_remaps(name, remaps)
+    return name
+
+
 ###############################################################################
 # Testing
 ###############################################################################
