@@ -121,10 +121,7 @@ class ResourceGraph(object):
 
     def register(self, resource):
         name = resource.full_name
-        remap = self.remaps.get(name)
-        while not remap is None:
-            name = remap
-            remap = self.remaps.get(name)
+        name = self.remaps.get(name, name)
         resource.full_name = name
         resource.namespace = name.rsplit("/", 1)[0]
         if name in self.resources:
@@ -180,6 +177,9 @@ def resolve_name(name, ns = "/", private_ns = ""):
 
 
 def apply_remaps(name, remaps):
+    """NOTE: It seems remappings do not work this way after all.
+        My tests show only one level of transformations.
+    """
     remap = remaps.get(name)
     while not remap is None:
         name = remap
@@ -190,7 +190,7 @@ def apply_remaps(name, remaps):
 def transform_name(name, ns = "/", private_ns = "", remaps = None):
     name = resolve_name(name, ns = ns, private_ns = private_ns)
     if remaps:
-        return apply_remaps(name, remaps)
+        return remaps.get(name, name)
     return name
 
 
