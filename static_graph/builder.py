@@ -38,9 +38,10 @@ class TopicGenerator(object):
         self.publisher  = method == "advertise"
 
     def generate(self, node, resources):
-        name = ROS.resolve_name(self.name, ns = node.namespace,
-                                private_ns = node.full_name)
-        topic = resources.get_topic(name, remap = True)
+        name = ROS.transform_name(self.name, ns = node.namespace,
+                                  private_ns = node.full_name,
+                                  remaps = node.remaps)
+        topic = resources.get_topic(name)
         if topic is None:
             topic = ROS.Topic(name)
             resources.register(topic)
@@ -65,9 +66,10 @@ class ServiceGenerator(object):
         self.server     = method == "advertiseService"
 
     def generate(self, node, resources):
-        name = ROS.resolve_name(self.name, ns = node.namespace,
-                                private_ns = node.full_name)
-        service = resources.get_service(name, remap = True)
+        name = ROS.transform_name(self.name, ns = node.namespace,
+                                  private_ns = node.full_name,
+                                  remaps = node.remaps)
+        service = resources.get_service(name)
         if service is None:
             service = ROS.Service(name)
             resources.register(service)
