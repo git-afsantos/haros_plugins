@@ -122,9 +122,9 @@ class LaunchFileAnalyser(object):
             if name == "remap":
                 self._remap_tag(child)
             elif name == "param":
-                self._param_tag(child)
+                self._param_tag(child, private = True)
             elif name == "rosparam":
-                self._rosparam_tag(child)
+                self._rosparam_tag(child, private = True)
             elif name == "env":
                 self.stats.env_tags += 1
             else:
@@ -205,7 +205,7 @@ class LaunchFileAnalyser(object):
 
     _PARAM_ATTRS = ("name", "value", "type", "textfile", "binfile", "command")
 
-    def _param_tag(self, tag):
+    def _param_tag(self, tag, private = False):
         attrib = self._attributes(tag.attrib, LaunchFileAnalyser._PARAM_ATTRS)
         self.stats.param_tags += 1
         if attrib.get("command"):
@@ -215,7 +215,7 @@ class LaunchFileAnalyser(object):
 
     _ROSPARAM_ATTRS = ("command", "file", "param", "ns", "subst_value")
 
-    def _rosparam_tag(self, tag):
+    def _rosparam_tag(self, tag, private = False):
         attrib = self._attributes(tag.attrib, LaunchFileAnalyser._ROSPARAM_ATTRS)
         self.stats.rosparam_tags += 1
         cmd = attrib.get("command", "load")

@@ -218,7 +218,6 @@ class LaunchScope(object):
             self.resources.enabled.register(node)
             self.launch.nodes.append(node)
         scope.node = node
-        scope.namespace = node.full_name
         self.launch.pkg_depends.add(pkg)
         return scope
 
