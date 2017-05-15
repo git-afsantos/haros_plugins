@@ -151,6 +151,7 @@ class CppFunction(CppEntity, CppStatementGroup):
         self.full_type = result
         self.result = result[6:] if result.startswith("const ") else result
         self.parameters = []
+        self.template_parameters = 0
         self.body = CppBlock(self, self, explicit = True)
         self.member_of = None
         self.references = []
@@ -501,7 +502,7 @@ class CppFunctionCall(CppExpression):
         if operator in CppOperator._BINARY_TOKENS:
             call = "{} {} {}".format(args[0], operator, args[1])
         else:
-            temp = "<" + self.template + ">" if self.template else ""
+            temp = "<" + ",".join(self.template) + ">" if self.template else ""
             args = ", ".join(args)
             if self.method_of:
                 o = self.method_of
@@ -518,7 +519,7 @@ class CppFunctionCall(CppExpression):
         return pretty.format(indent, call)
 
     def __repr__(self):
-        temp = "<" + self.template + ">" if self.template else ""
+        temp = "<" + ",".join(self.template) + ">" if self.template else ""
         args = ", ".join([str(arg) for arg in self.arguments])
         if self.is_constructor:
             return "[{}] new {}({})".format(self.result, self.name, args)
@@ -991,6 +992,7 @@ class CppExpressionBuilder(CppEntityBuilder):
                 except ValueError as e:
                     if cppobj.is_constructor:
                         cppobj.full_name = cppobj.result + "::" + cppobj.name
+                cppobj.template = self._parse_templates(cppobj.name, tokens)
     # -------------------------------------------------------------------------
                 ref = self.cursor.get_definition() or self.cursor.referenced
                 if ref:
@@ -1009,13 +1011,6 @@ class CppExpressionBuilder(CppEntityBuilder):
                         builders.append(CppExpressionBuilder(children[0],
                                         self.scope, cppobj,
                                         insert = cppobj._set_method))
-                        template = []
-                        for c in children[1:]:
-                            if c.kind == CK.NAMESPACE_REF \
-                                    or c.kind == CK.TYPE_REF:
-                                template.append(c.spelling)
-                        if template:
-                            cppobj.template = "::".join(template)
                 if not args and cppobj.is_constructor:
                     for cursor in self.cursor.get_children():
                         builders.append(CppExpressionBuilder(cursor,
@@ -1107,6 +1102,25 @@ class CppExpressionBuilder(CppEntityBuilder):
                 if token in CppOperator._BINARY_TOKENS:
                     return token
         return "[op]"
+
+    def _parse_templates(self, name, tokens):
+        templates = []
+        text = "".join(tokens)
+        start = text.find("<")
+        if start >= 0 and not "<" in name and not ">" in name:
+            matches = 1
+            i = start + 1
+            while matches > 0:
+                if text[i] == "<":
+                    matches += 1
+                elif text[i] == ">":
+                    matches -= 1
+                elif text[i] == "," and matches == 1:
+                    templates.append(text[start+1:i])
+                    start = i
+                i += 1
+            templates.append(text[start+1:i-1])
+        return tuple(templates)
 
 
 class CppStatementBuilder(CppEntityBuilder):
@@ -1347,7 +1361,7 @@ class CppTopLevelBuilder(CppEntityBuilder):
         return result
 
 
-    _FUNCTIONS = (CK.FUNCTION_DECL, CK.CXX_METHOD,
+    _FUNCTIONS = (CK.FUNCTION_DECL, CK.FUNCTION_TEMPLATE, CK.CXX_METHOD,
                   CK.CONSTRUCTOR, CK.DESTRUCTOR)
 
     def _build_function(self, data):
@@ -1371,6 +1385,8 @@ class CppTopLevelBuilder(CppEntityBuilder):
                     var = CppVariable(cppobj, cppobj, id, name, result)
                     data.register(var)
                     cppobj.parameters.append(var)
+                elif cursor.kind == CK.TEMPLATE_TYPE_PARAMETER:
+                    cppobj.template_parameters += 1
                 elif cursor.kind == CK.MEMBER_REF:
                     # This is for constructors, we need the sibling
                     declaration = False
