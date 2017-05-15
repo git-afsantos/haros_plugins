@@ -8,7 +8,7 @@ import os
 import haros_util.ros_model as ROS
 from clang_plugin.new_cpp_model import CppAstParser, CppQuery, \
                                         CppFunctionCall, CppDefaultArgument, \
-                                        resolve_reference
+                                        CppOperator, resolve_reference
 from cmake_analyser.analyser import CMakeAnalyser
 from launch_analyser.analyser import LaunchFileAnalyser
 
