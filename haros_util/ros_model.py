@@ -32,15 +32,17 @@ class Node(Resource):
 
 
 class Topic(Resource):
-    def __init__(self, name, ns = "/", private_ns = ""):
+    def __init__(self, name, ns = "/", private_ns = "", message_type = None):
         Resource.__init__(self, name, ns = ns, private_ns = private_ns)
+        self.message_type = message_type
         self.publishers = []
         self.subscribers = []
 
 
 class Service(Resource):
-    def __init__(self, name, ns = "/", private_ns = ""):
+    def __init__(self, name, ns = "/", private_ns = "", message_type = None):
         Resource.__init__(self, name, ns = ns, private_ns = private_ns)
+        self.message_type = message_type
         self.server = None
         self.clients = []
 

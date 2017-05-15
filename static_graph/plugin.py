@@ -44,11 +44,7 @@ def package_analysis(iface, package):
 
 def post_analysis(iface):
     try:
-        #print iface.state.builder._exe["kobuki_node"]
-        #return
         for launch_file in iface.state.launch_files:
-            if not launch_file.name.endswith("minimal.launch"):
-                continue
             config = iface.state.builder.from_launch(launch_file, iface)
             print
             if not config:
@@ -77,6 +73,10 @@ def post_analysis(iface):
                 ts = map(lambda x: x.full_name, node.clients)
                 if ts:
                     print "    cli {}".format(ts)
+            for w in iface.state.builder.errors:
+                print
+                print w.message
+                print "  {} [{}/{}]".format(node.full_name, node.package, node.node_type)
     except Exception as e:
         print traceback.print_exc()
     if iface.state.builder.unknown_packages:

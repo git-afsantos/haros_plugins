@@ -27,24 +27,27 @@ MAGICK_INCLUDE  = "/usr/include/ImageMagick"
 ###############################################################################
 
 class TopicGenerator(object):
-    def __init__(self, name, namespace, method):
+    def __init__(self, name, namespace, method, message_type):
         if namespace:
             if namespace[-1].isalpha():
                 name = namespace + "/" + name
             else:
                 name = namespace + name
-        self.name       = name
-        self.namespace  = namespace
-        self.publisher  = method == "advertise"
+        self.name           = name
+        self.namespace      = namespace
+        self.message_type   = message_type
+        self.publisher      = method == "advertise"
 
-    def generate(self, node, resources):
+    def generate(self, node, resources, errors):
         name = ROS.transform_name(self.name, ns = node.namespace,
                                   private_ns = node.full_name,
                                   remaps = node.remaps)
         topic = resources.get_topic(name)
         if topic is None:
-            topic = ROS.Topic(name)
+            topic = ROS.Topic(name, message_type = self.message_type)
             resources.register(topic)
+        if self.message_type != topic.message_type:
+            errors.append(ConfigurationError("Message type mismatch on topic " + name, node))
         if self.publisher:
             node.publishers.append(topic)
             topic.publishers.append(node)
@@ -55,24 +58,27 @@ class TopicGenerator(object):
 
 
 class ServiceGenerator(object):
-    def __init__(self, name, namespace, method):
+    def __init__(self, name, namespace, method, message_type):
         if namespace:
             if namespace[-1].isalpha():
                 name = namespace + "/" + name
             else:
                 name = namespace + name
-        self.name       = name
-        self.namespace  = namespace
-        self.server     = method == "advertiseService"
+        self.name           = name
+        self.namespace      = namespace
+        self.message_type   = message_type
+        self.server         = method == "advertiseService"
 
-    def generate(self, node, resources):
+    def generate(self, node, resources, errors):
         name = ROS.transform_name(self.name, ns = node.namespace,
                                   private_ns = node.full_name,
                                   remaps = node.remaps)
         service = resources.get_service(name)
         if service is None:
-            service = ROS.Service(name)
+            service = ROS.Service(name, message_type = self.message_type)
             resources.register(service)
+        if self.message_type != service.message_type:
+            errors.append(ConfigurationError("Message type mismatch on service " + name, node))
         if self.server:
             node.servers.append(service)
             service.server = node
@@ -86,7 +92,7 @@ class ErrorGenerator(object):
     def __init__(self, message):
         self.message = message
 
-    def generate(self, node, resources):
+    def generate(self, node, resources, errors):
         node._error = self.message
         return self.message
 
@@ -103,12 +109,19 @@ def setup():
     CppAstParser.set_database(DB_PATH)
 
 
+class ConfigurationError(object):
+    def __init__(self, message, node):
+        self.message = message
+        self.node = node
+
+
 class ConfigurationBuilder(object):
     def __init__(self):
     # public:
         self.environment = dict(os.environ)
         self.launch_files = set()
         self.unknown_packages = set()
+        self.errors = []
     # private:
         self._config = None
         self._exe = {}  # package -> (name -> [file])
@@ -166,6 +179,7 @@ class ConfigurationBuilder(object):
         path = launch_file.get_path()
         if path in self.launch_files:
             return None
+        self.errors = []
         self.launch_files.add(path)
         config = ROS.Configuration(path.replace(CWS, ""),
                                    self.environment)
@@ -202,7 +216,7 @@ class ConfigurationBuilder(object):
             self._gen_entry = None
         assert ref in self._gen
         for generator in self._gen[ref]:
-            generator.generate(node, self._config.resources)
+            generator.generate(node, self._config.resources, self.errors)
             node._analysed = True
         if not self._gen[ref]:
             node._error = "no ROS primitives"
@@ -242,7 +256,8 @@ class ConfigurationBuilder(object):
             topic = call.arguments[0]
             if isinstance(topic, basestring):
                 ns = self._resolve_node_handle(call)
-                self._gen_entry.append(generator(topic, ns, call.name))
+                mtype = self._get_message_type(call)
+                self._gen_entry.append(generator(topic, ns, call.name, mtype))
 
 
     def _resolve_node_handle(self, call):
@@ -269,3 +284,31 @@ class ConfigurationBuilder(object):
                 elif value.name == "getPrivateNodeHandle":
                     ns = "~"
         return ns
+
+    def _get_message_type(self, call):
+        if call.template:
+            return call.template[0]
+        callback = call.arguments[2] if call.name == "subscribe" \
+                                     else call.arguments[1]
+        while isinstance(callback, CppOperator):
+            callback = callback.arguments[0]
+        type_string = callback.result
+        type_string = type_string.split(None, 1)[1]
+        if type_string[0] == "(" and type_string[-1] == ")":
+            type_string = type_string[1:-1]
+            is_const = type_string.startswith("const ")
+            if is_const:
+                type_string = type_string[6:]
+            is_ref = type_string.endswith(" &")
+            if is_ref:
+                type_string = type_string[:-2]
+            is_ptr = type_string.endswith("::ConstPtr")
+            if is_ptr:
+                type_string = type_string[:-10]
+            else:
+                is_ptr = type_string.endswith("ConstPtr")
+                if is_ptr:
+                    type_string = type_string[:-8]
+        if type_string.startswith("boost::function"):
+            type_string = type_string[52:-25]
+        return type_string
