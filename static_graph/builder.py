@@ -40,7 +40,7 @@ class BaseGenerator(object):
         self.message_type = self._extract_message_type(call)
 
     def _extract_name(self, call):
-        name = call.arguments[0]
+        name = resolve_expression(call.arguments[0])
         if not isinstance(name, basestring):
             name = "?"
         return name
@@ -305,12 +305,8 @@ class ConfigurationBuilder(object):
     def _onRosPrimitive(self, call, generator):
         """Called after a primitive call is detected in the C++ AST."""
         if len(call.arguments) > 1:
-            topic = call.arguments[0]
-            if not isinstance(topic, basestring):
-                topic = "?"
             ns = self._resolve_node_handle(call)
-            mtype = self._get_message_type(call)
-            self._gen_entry.append(generator(topic, ns, call.name, mtype))
+            self._gen_entry.append(generator(ns, call))
 
 
     def _resolve_node_handle(self, call):
@@ -337,31 +333,3 @@ class ConfigurationBuilder(object):
                 elif value.name == "getPrivateNodeHandle":
                     ns = "~"
         return ns
-
-    def _get_message_type(self, call):
-        if call.template:
-            return call.template[0]
-        callback = call.arguments[2] if call.name == "subscribe" \
-                                     else call.arguments[1]
-        while isinstance(callback, CppOperator):
-            callback = callback.arguments[0]
-        type_string = callback.result
-        type_string = type_string.split(None, 1)[1]
-        if type_string[0] == "(" and type_string[-1] == ")":
-            type_string = type_string[1:-1]
-            is_const = type_string.startswith("const ")
-            if is_const:
-                type_string = type_string[6:]
-            is_ref = type_string.endswith(" &")
-            if is_ref:
-                type_string = type_string[:-2]
-            is_ptr = type_string.endswith("::ConstPtr")
-            if is_ptr:
-                type_string = type_string[:-10]
-            else:
-                is_ptr = type_string.endswith("ConstPtr")
-                if is_ptr:
-                    type_string = type_string[:-8]
-        if type_string.startswith("boost::function"):
-            type_string = type_string[52:-25]
-        return type_string
