@@ -85,11 +85,11 @@ def _type_check_topics(config):
     for topic in config.resources.get_topics():
         for pub in topic.publishers:
             if pub[1] and pub[1] != topic.message_type:
-                print "[WARNING] Topic type mismatch on publisher", node.reference
+                print "[WARNING] Topic type mismatch on publisher", pub[0].reference
                 print "  expected:", topic.message_type
                 print "     found:", pub[1]
         for sub in topic.subscribers:
             if sub[1] and sub[1] != topic.message_type:
-                print "[WARNING] Topic type mismatch on subscriber", node.reference
+                print "[WARNING] Topic type mismatch on subscriber", sub[0].reference
                 print "  expected:", topic.message_type
                 print "     found:", sub[1]
