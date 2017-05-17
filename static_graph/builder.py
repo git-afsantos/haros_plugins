@@ -8,7 +8,8 @@ import os
 import haros_util.ros_model as ROS
 from clang_plugin.new_cpp_model import CppAstParser, CppQuery, \
                                         CppFunctionCall, CppDefaultArgument, \
-                                        CppOperator, resolve_reference
+                                        CppOperator, resolve_reference, \
+                                        resolve_expression
 from cmake_analyser.analyser import CMakeAnalyser
 from launch_analyser.analyser import LaunchFileAnalyser
 
@@ -26,8 +27,9 @@ MAGICK_INCLUDE  = "/usr/include/ImageMagick"
 # Resource Generators
 ###############################################################################
 
-class TopicGenerator(object):
-    def __init__(self, name, namespace, method, message_type):
+class BaseGenerator(object):
+    def __init__(self, namespace, call):
+        name = self._extract_name(call)
         if namespace:
             if namespace[-1].isalpha():
                 name = namespace + "/" + name
@@ -35,8 +37,49 @@ class TopicGenerator(object):
                 name = namespace + name
         self.name           = name
         self.namespace      = namespace
-        self.message_type   = message_type
-        self.publisher      = method == "advertise"
+        self.message_type = self._extract_message_type(call)
+
+    def _extract_name(self, call):
+        name = call.arguments[0]
+        if not isinstance(name, basestring):
+            name = "?"
+        return name
+
+    def _extract_message_type(self, call):
+        if call.template:
+            return call.template[0]
+        callback = call.arguments[2] if call.name == "subscribe" \
+                                     else call.arguments[1]
+        while isinstance(callback, CppOperator):
+            callback = callback.arguments[0]
+        type_string = callback.result
+        type_string = type_string.split(None, 1)[1]
+        if type_string[0] == "(" and type_string[-1] == ")":
+            type_string = type_string[1:-1]
+            is_const = type_string.startswith("const ")
+            if is_const:
+                type_string = type_string[6:]
+            is_ref = type_string.endswith(" &")
+            if is_ref:
+                type_string = type_string[:-2]
+            is_ptr = type_string.endswith("::ConstPtr")
+            if is_ptr:
+                type_string = type_string[:-10]
+            else:
+                is_ptr = type_string.endswith("ConstPtr")
+                if is_ptr:
+                    type_string = type_string[:-8]
+        if type_string.startswith("boost::function"):
+            type_string = type_string[52:-25]
+        return type_string
+
+
+class TopicGenerator(BaseGenerator):
+    def __init__(self, namespace, call):
+        BaseGenerator.__init__(self, namespace, call)
+        self.publisher = call.name == "advertise"
+        self.queue_size = self._extract_queue_size(call)
+        self.latch = self._extract_latching(call)
 
     def generate(self, node, resources, errors):
         name = ROS.transform_name(self.name, ns = node.namespace,
@@ -49,25 +92,34 @@ class TopicGenerator(object):
         if self.message_type != topic.message_type:
             errors.append(ConfigurationError("Message type mismatch on topic " + name, node))
         if self.publisher:
-            node.publishers.append(topic)
-            topic.publishers.append(node)
+            node.add_publisher(topic, self.message_type)
+            topic.add_publisher(node, self.message_type)
         else:
-            node.subscribers.append(topic)
-            topic.subscribers.append(node)
+            node.add_subscriber(topic, self.message_type)
+            topic.add_subscriber(node, self.message_type)
         return topic
 
+    def _extract_queue_size(self, call):
+        queue_size = resolve_expression(call.arguments[1])
+        if isinstance(queue_size, (int, long, float)):
+            return queue_size
+        return None
 
-class ServiceGenerator(object):
-    def __init__(self, name, namespace, method, message_type):
-        if namespace:
-            if namespace[-1].isalpha():
-                name = namespace + "/" + name
-            else:
-                name = namespace + name
-        self.name           = name
-        self.namespace      = namespace
-        self.message_type   = message_type
-        self.server         = method == "advertiseService"
+    def _extract_latching(self, call):
+        if self.publisher:
+            latch = call.arguments[-1]
+            if isinstance(latch, CppDefaultArgument):
+                latch = False
+            elif not isinstance(latch, bool):
+                latch = resolve_expression(latch)
+            return latch
+        return None
+
+
+class ServiceGenerator(BaseGenerator):
+    def __init__(self, namespace, call):
+        BaseGenerator.__init__(self, namespace, call)
+        self.server = call.name == "advertiseService"
 
     def generate(self, node, resources, errors):
         name = ROS.transform_name(self.name, ns = node.namespace,
@@ -80,11 +132,11 @@ class ServiceGenerator(object):
         if self.message_type != service.message_type:
             errors.append(ConfigurationError("Message type mismatch on service " + name, node))
         if self.server:
-            node.servers.append(service)
-            service.server = node
+            node.add_server(service, self.message_type)
+            service.set_server(node, self.message_type)
         else:
-            node.clients.append(service)
-            service.clients.append(node)
+            node.add_client(service, self.message_type)
+            service.add_client(node, self.message_type)
         return service
 
 
@@ -254,10 +306,11 @@ class ConfigurationBuilder(object):
         """Called after a primitive call is detected in the C++ AST."""
         if len(call.arguments) > 1:
             topic = call.arguments[0]
-            if isinstance(topic, basestring):
-                ns = self._resolve_node_handle(call)
-                mtype = self._get_message_type(call)
-                self._gen_entry.append(generator(topic, ns, call.name, mtype))
+            if not isinstance(topic, basestring):
+                topic = "?"
+            ns = self._resolve_node_handle(call)
+            mtype = self._get_message_type(call)
+            self._gen_entry.append(generator(topic, ns, call.name, mtype))
 
 
     def _resolve_node_handle(self, call):

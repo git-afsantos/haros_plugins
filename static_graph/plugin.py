@@ -62,15 +62,15 @@ def post_analysis(iface):
                 if not node._analysed or node._error:
                     print "    [N/A]", node._error
                     continue
-                ts = map(lambda x: x.full_name, node.publishers)
+                ts = map(lambda x: x[0].full_name, node.publishers)
                 if ts:
                     print "    pub {}".format(ts)
-                ts = map(lambda x: x.full_name, node.subscribers)
+                ts = map(lambda x: x[0].full_name, node.subscribers)
                 print "    sub {}".format(ts)
-                ts = map(lambda x: x.full_name, node.servers)
+                ts = map(lambda x: x[0].full_name, node.servers)
                 if ts:
                     print "    srv {}".format(ts)
-                ts = map(lambda x: x.full_name, node.clients)
+                ts = map(lambda x: x[0].full_name, node.clients)
                 if ts:
                     print "    cli {}".format(ts)
             for w in iface.state.builder.errors:
@@ -82,3 +82,13 @@ def post_analysis(iface):
     if iface.state.builder.unknown_packages:
         print
         print "Unknown packages", iface.state.builder.unknown_packages
+
+
+def _type_check_topics(config):
+    for topic in config.resources.get_topics():
+        print
+        print "TOPIC", topic.full_name
+        for pub in topic.publishers:
+            print "  [pub]", pub
+        for sub in topic.subscribers:
+            print "  [sub]", sub
