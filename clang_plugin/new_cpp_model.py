@@ -1110,7 +1110,7 @@ class CppExpressionBuilder(CppEntityBuilder):
         if start >= 0 and not "<" in name and not ">" in name:
             matches = 1
             i = start + 1
-            while matches > 0:
+            while matches > 0 and i < len(text):
                 if text[i] == "<":
                     matches += 1
                 elif text[i] == ">":
@@ -1119,6 +1119,8 @@ class CppExpressionBuilder(CppEntityBuilder):
                     templates.append(text[start+1:i])
                     start = i
                 i += 1
+            if i == len(text):
+                return ()
             templates.append(text[start+1:i-1])
         return tuple(templates)
 
