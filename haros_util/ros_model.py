@@ -37,10 +37,10 @@ class Node(Resource):
         self.subscribers.append((topic, message_type, queue_size, nesting))
 
     def add_server(self, service, message_type, nesting = 0):
-        self.servers.append((node, message_type, nesting))
+        self.servers.append((service, message_type, nesting))
 
     def add_client(self, service, message_type, nesting = 0):
-        self.clients.append((node, message_type, nesting))
+        self.clients.append((service, message_type, nesting))
 
 
 class Topic(Resource):
