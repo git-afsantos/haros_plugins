@@ -30,6 +30,18 @@ class Node(Resource):
     def reference(self):
         return self.package + "/" + self.node_type
 
+    def add_publisher(self, topic, message_type, queue_size = 0, nesting = 0):
+        self.publishers.append((topic, message_type, queue_size, nesting))
+
+    def add_subscriber(self, topic, message_type, queue_size = 0, nesting = 0):
+        self.subscribers.append((topic, message_type, queue_size, nesting))
+
+    def add_server(self, service, message_type, nesting = 0):
+        self.servers.append((node, message_type, nesting))
+
+    def add_client(self, service, message_type, nesting = 0):
+        self.clients.append((node, message_type, nesting))
+
 
 class Topic(Resource):
     def __init__(self, name, ns = "/", private_ns = "", message_type = None):
@@ -38,6 +50,12 @@ class Topic(Resource):
         self.publishers = []
         self.subscribers = []
 
+    def add_publisher(self, node, message_type, queue_size = 0, nesting = 0):
+        self.publishers.append((node, message_type, queue_size, nesting))
+
+    def add_subscriber(self, node, message_type, queue_size = 0, nesting = 0):
+        self.subscribers.append((node, message_type, queue_size, nesting))
+
 
 class Service(Resource):
     def __init__(self, name, ns = "/", private_ns = "", message_type = None):
@@ -45,6 +63,12 @@ class Service(Resource):
         self.message_type = message_type
         self.server = None
         self.clients = []
+
+    def set_server(self, node, message_type, nesting = 0):
+        self.server = (node, message_type, nesting)
+
+    def add_client(self, node, message_type, nesting = 0):
+        self.clients.append((node, message_type, nesting))
 
 
 class Parameter(Resource):
