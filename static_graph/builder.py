@@ -81,7 +81,7 @@ class TopicGenerator(BaseGenerator):
         self.queue_size = self._extract_queue_size(call)
         self.latch = self._extract_latching(call)
 
-    def generate(self, node, resources, errors):
+    def generate(self, node, resources):
         name = ROS.transform_name(self.name, ns = node.namespace,
                                   private_ns = node.full_name,
                                   remaps = node.remaps)
@@ -89,8 +89,6 @@ class TopicGenerator(BaseGenerator):
         if topic is None:
             topic = ROS.Topic(name, message_type = self.message_type)
             resources.register(topic)
-        if self.message_type != topic.message_type:
-            errors.append(ConfigurationError("Message type mismatch on topic " + name, node))
         if self.publisher:
             node.add_publisher(topic, self.message_type)
             topic.add_publisher(node, self.message_type)
@@ -121,7 +119,7 @@ class ServiceGenerator(BaseGenerator):
         BaseGenerator.__init__(self, namespace, call)
         self.server = call.name == "advertiseService"
 
-    def generate(self, node, resources, errors):
+    def generate(self, node, resources):
         name = ROS.transform_name(self.name, ns = node.namespace,
                                   private_ns = node.full_name,
                                   remaps = node.remaps)
@@ -129,8 +127,6 @@ class ServiceGenerator(BaseGenerator):
         if service is None:
             service = ROS.Service(name, message_type = self.message_type)
             resources.register(service)
-        if self.message_type != service.message_type:
-            errors.append(ConfigurationError("Message type mismatch on service " + name, node))
         if self.server:
             node.add_server(service, self.message_type)
             service.set_server(node, self.message_type)
@@ -144,7 +140,7 @@ class ErrorGenerator(object):
     def __init__(self, message):
         self.message = message
 
-    def generate(self, node, resources, errors):
+    def generate(self, node, resources):
         node._error = self.message
         return self.message
 
@@ -161,19 +157,12 @@ def setup():
     CppAstParser.set_database(DB_PATH)
 
 
-class ConfigurationError(object):
-    def __init__(self, message, node):
-        self.message = message
-        self.node = node
-
-
 class ConfigurationBuilder(object):
     def __init__(self):
     # public:
         self.environment = dict(os.environ)
         self.launch_files = set()
         self.unknown_packages = set()
-        self.errors = []
     # private:
         self._config = None
         self._exe = {}  # package -> (name -> [file])
@@ -231,7 +220,6 @@ class ConfigurationBuilder(object):
         path = launch_file.get_path()
         if path in self.launch_files:
             return None
-        self.errors = []
         self.launch_files.add(path)
         config = ROS.Configuration(path.replace(CWS, ""),
                                    self.environment)
@@ -268,7 +256,7 @@ class ConfigurationBuilder(object):
             self._gen_entry = None
         assert ref in self._gen
         for generator in self._gen[ref]:
-            generator.generate(node, self._config.resources, self.errors)
+            generator.generate(node, self._config.resources)
             node._analysed = True
         if not self._gen[ref]:
             node._error = "no ROS primitives"

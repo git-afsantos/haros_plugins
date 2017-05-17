@@ -56,27 +56,24 @@ def post_analysis(iface):
             if config.env_depends:
                 print "Depends on environment:"
                 print "   ", config.env_depends
-            print "Nodes:"
-            for node in config.nodes():
-                print "  {} [{}/{}]".format(node.full_name, node.package, node.node_type)
-                if not node._analysed or node._error:
-                    print "    [N/A]", node._error
-                    continue
-                ts = map(lambda x: x[0].full_name, node.publishers)
-                if ts:
-                    print "    pub {}".format(ts)
-                ts = map(lambda x: x[0].full_name, node.subscribers)
-                print "    sub {}".format(ts)
-                ts = map(lambda x: x[0].full_name, node.servers)
-                if ts:
-                    print "    srv {}".format(ts)
-                ts = map(lambda x: x[0].full_name, node.clients)
-                if ts:
-                    print "    cli {}".format(ts)
-            for w in iface.state.builder.errors:
-                print
-                print w.message
-                print "  {} [{}/{}]".format(node.full_name, node.package, node.node_type)
+            # print "Nodes:"
+            # for node in config.nodes():
+                # print "  {} [{}/{}]".format(node.full_name, node.package, node.node_type)
+                # if not node._analysed or node._error:
+                    # print "    [N/A]", node._error
+                    # continue
+                # ts = map(lambda x: x[0].full_name, node.publishers)
+                # if ts:
+                    # print "    pub {}".format(ts)
+                # ts = map(lambda x: x[0].full_name, node.subscribers)
+                # print "    sub {}".format(ts)
+                # ts = map(lambda x: x[0].full_name, node.servers)
+                # if ts:
+                    # print "    srv {}".format(ts)
+                # ts = map(lambda x: x[0].full_name, node.clients)
+                # if ts:
+                    # print "    cli {}".format(ts)
+            _type_check_topics(config)
     except Exception as e:
         print traceback.print_exc()
     if iface.state.builder.unknown_packages:
