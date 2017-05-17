@@ -48,6 +48,8 @@ class BaseGenerator(object):
     def _extract_message_type(self, call):
         if call.template:
             return call.template[0]
+        if call.name != "subscribe" and call.name != "advertiseService":
+            return "?"
         callback = call.arguments[2] if call.name == "subscribe" \
                                      else call.arguments[1]
         while isinstance(callback, CppOperator):

@@ -1108,7 +1108,7 @@ class CppExpressionBuilder(CppEntityBuilder):
         text = "".join(tokens)
         start = text.find("<")
         if (start >= 0 and not "<" in name and not ">" in name
-                       and text[:start] == name):
+                       and text[:start].endswith(name)):
             matches = 1
             i = start + 1
             while matches > 0 and i < len(text):
