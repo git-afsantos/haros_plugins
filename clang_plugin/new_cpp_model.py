@@ -1052,10 +1052,11 @@ class CppExpressionBuilder(CppEntityBuilder):
         if self.cursor.kind == CK.PAREN_EXPR \
                 or self.cursor.kind == CK.CSTYLE_CAST_EXPR:
             original = self.cursor
-            self.cursor = next(self.cursor.get_children(), None)
+            children = list(self.cursor.get_children())
             self.parenthesis = original.kind == CK.PAREN_EXPR
             result = None
-            if self.cursor:
+            if children:
+                self.cursor = children[-1]
                 self.name = self.cursor.spelling
                 result = self.build(data)
             self.cursor = original
@@ -1703,6 +1704,8 @@ def resolve_reference(reference):
             if isinstance(arg, CppReference):
                 return resolve_reference(arg)
             return arg
+        if isinstance(value, CppExpression.TYPES):
+            return resolve_expression(value)
         return value
     return reference.reference
 
