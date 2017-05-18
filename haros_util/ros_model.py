@@ -50,6 +50,12 @@ class Topic(Resource):
         self.publishers = []
         self.subscribers = []
 
+    @property
+    def is_disconnected(self):
+        p = len(self.publishers)
+        s = len(self.subscribers)
+        return p + s > 0 and (p == 0 or s == 0)
+
     def add_publisher(self, node, message_type, queue_size = 0, nesting = 0):
         self.publishers.append((node, message_type, queue_size, nesting))
 
@@ -63,6 +69,12 @@ class Service(Resource):
         self.message_type = message_type
         self.server = None
         self.clients = []
+
+    @property
+    def is_disconnected(self):
+        s = 1 if not self.server is None else 0
+        c = len(self.clients)
+        return s + c > 0 and (s == 0 or c == 0)
 
     def set_server(self, node, message_type, nesting = 0):
         self.server = (node, message_type, nesting)
