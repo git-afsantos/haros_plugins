@@ -52,27 +52,28 @@ def post_analysis(iface):
                 continue
             print config.name
             print "Depends on packages:"
-            print "   ", config.pkg_depends
+            print "   ", ", ".join(config.pkg_depends)
             if config.env_depends:
                 print "Depends on environment:"
-                print "   ", config.env_depends
-            # print "Nodes:"
-            # for node in config.nodes():
-                # print "  {} [{}/{}]".format(node.full_name, node.package, node.node_type)
-                # if not node._analysed or node._error:
-                    # print "    [N/A]", node._error
-                    # continue
-                # ts = map(lambda x: x[0].full_name, node.publishers)
-                # if ts:
-                    # print "    pub {}".format(ts)
-                # ts = map(lambda x: x[0].full_name, node.subscribers)
-                # print "    sub {}".format(ts)
-                # ts = map(lambda x: x[0].full_name, node.servers)
-                # if ts:
-                    # print "    srv {}".format(ts)
-                # ts = map(lambda x: x[0].full_name, node.clients)
-                # if ts:
-                    # print "    cli {}".format(ts)
+                print "   ", ", ".join(config.env_depends)
+            print "Nodes:"
+            for node in config.nodes():
+                print "  {} [{}/{}]".format(node.full_name, node.package, node.node_type)
+                if not node._analysed or node._error:
+                    print "    [N/A]", node._error
+                    continue
+                for pub in node.publishers:
+                    print "    pub{}[{}] {}".format("*" if pub[3] else "",
+                                                    pub[2], pub[0].full_name)
+                for sub in node.subscribers:
+                    print "    sub{}[{}] {}".format("*" if sub[3] else "",
+                                                    sub[2], sub[0].full_name)
+                for srv in node.servers:
+                    print "    srv{} {}".format("*" if srv[2] else "",
+                                                srv[0].full_name)
+                for cli in node.clients:
+                    print "    cli{} {}".format("*" if cli[2] else "",
+                                                cli[0].full_name)
             _type_check_topics(config)
     except Exception as e:
         print traceback.print_exc()

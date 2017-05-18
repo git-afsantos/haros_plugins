@@ -9,7 +9,7 @@ import haros_util.ros_model as ROS
 from clang_plugin.new_cpp_model import CppAstParser, CppQuery, \
                                         CppFunctionCall, CppDefaultArgument, \
                                         CppOperator, resolve_reference, \
-                                        resolve_expression
+                                        resolve_expression, get_control_depth
 from cmake_analyser.analyser import CMakeAnalyser
 from launch_analyser.analyser import LaunchFileAnalyser
 
@@ -38,6 +38,7 @@ class BaseGenerator(object):
         self.name           = name
         self.namespace      = namespace
         self.message_type = self._extract_message_type(call)
+        self.nesting = get_control_depth(call, recursive = True)
 
     def _extract_name(self, call):
         name = resolve_expression(call.arguments[0])
@@ -92,11 +93,19 @@ class TopicGenerator(BaseGenerator):
             topic = ROS.Topic(name, message_type = self.message_type)
             resources.register(topic)
         if self.publisher:
-            node.add_publisher(topic, self.message_type)
-            topic.add_publisher(node, self.message_type)
+            node.add_publisher(topic, self.message_type,
+                               queue_size = self.queue_size,
+                               nesting = self.nesting)
+            topic.add_publisher(node, self.message_type,
+                                queue_size = self.queue_size,
+                                nesting = self.nesting)
         else:
-            node.add_subscriber(topic, self.message_type)
-            topic.add_subscriber(node, self.message_type)
+            node.add_subscriber(topic, self.message_type,
+                                queue_size = self.queue_size,
+                                nesting = self.nesting)
+            topic.add_subscriber(node, self.message_type,
+                                 queue_size = self.queue_size,
+                                 nesting = self.nesting)
         return topic
 
     def _extract_queue_size(self, call):
@@ -130,11 +139,11 @@ class ServiceGenerator(BaseGenerator):
             service = ROS.Service(name, message_type = self.message_type)
             resources.register(service)
         if self.server:
-            node.add_server(service, self.message_type)
-            service.set_server(node, self.message_type)
+            node.add_server(service, self.message_type, nesting = self.nesting)
+            service.set_server(node, self.message_type, nesting = self.nesting)
         else:
-            node.add_client(service, self.message_type)
-            service.add_client(node, self.message_type)
+            node.add_client(service, self.message_type, nesting = self.nesting)
+            service.add_client(node, self.message_type, nesting = self.nesting)
         return service
 
 

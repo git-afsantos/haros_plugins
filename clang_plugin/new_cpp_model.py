@@ -1707,6 +1707,26 @@ def resolve_reference(reference):
     return reference.reference
 
 
+def is_under_control_flow(cppobj, recursive = False):
+    return get_control_depth(cppobj, recursive) > 0
+
+def get_control_depth(cppobj, recursive = False):
+    depth = 0
+    while not cppobj is None:
+        if (isinstance(cppobj, CppBlock)
+                and isinstance(cppobj.parent, CppControlFlow)):
+            depth += 1
+        elif isinstance(cppobj, CppFunction):
+            if recursive:
+                calls = [get_control_depth(call) for call in cppobj.references
+                                if isinstance(call, CppFunctionCall)]
+                if calls:
+                    depth += max(calls)
+            return depth
+        cppobj = cppobj.parent
+    return depth
+
+
 ###############################################################################
 # Helpers
 ###############################################################################
