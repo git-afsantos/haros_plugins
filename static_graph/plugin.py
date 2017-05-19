@@ -75,6 +75,7 @@ def post_analysis(iface):
                     print "    cli{} {}".format("*" if cli[2] else "",
                                                 cli[0].full_name)
             _type_check_topics(config)
+            _check_disconnected_topics(config)
     except Exception as e:
         print traceback.print_exc()
     if iface.state.builder.unknown_packages:
@@ -94,3 +95,28 @@ def _type_check_topics(config):
                 print "[WARNING] Topic type mismatch on subscriber", sub[0].reference
                 print "  expected:", topic.message_type
                 print "     found:", sub[1]
+
+
+def _check_disconnected_topics(config):
+    topics = config.resources.get_topics()
+    for topic in topics:
+        if topic.is_disconnected:
+            for other in topics:
+                if other is topic:
+                    continue
+                test = other.is_disconnected
+                test = test and len(topic.publishers) != len(other.publishers)
+                test = test and topic.message_type == other.message_type
+                test = test and _names_are_similar(topic, other)
+                if test:
+                    print "[WARNING] Possible naming mistake."
+                    print "  Topics {} and {} are similar and disconnected.".format(
+                                topic.full_name, other.full_name)
+
+
+def _names_are_similar(r1, r2):
+    return (r1.full_name.endswith(r2.name)
+            or r2.full_name.endswith(r1.name)
+            or r1.original_name.endswith(r2.name)
+            or r2.original_name.endswith(r1.name)
+            or r1.given_name == r2.given_name)
