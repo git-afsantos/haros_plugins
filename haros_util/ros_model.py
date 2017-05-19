@@ -157,9 +157,10 @@ class ResourceGraph(object):
                     all.append(r)
         return all
 
-    def register(self, resource):
+    def register(self, resource, remaps = None):
+        remaps = self.remaps if remaps is None else remaps
         name = resource.full_name
-        name = self.remaps.get(name, name)
+        name = remaps.get(name, name)
         resource.full_name = name
         resource.namespace = name.rsplit("/", 1)[0]
         if name in self.resources:

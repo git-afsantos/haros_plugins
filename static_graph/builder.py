@@ -90,8 +90,10 @@ class TopicGenerator(BaseGenerator):
                                   remaps = node.remaps)
         topic = resources.get_topic(name)
         if topic is None:
-            topic = ROS.Topic(name, message_type = self.message_type)
-            resources.register(topic)
+            topic = ROS.Topic(self.name, ns = node.namespace,
+                              private_ns = node.full_name,
+                              message_type = self.message_type)
+            resources.register(topic, remaps = node.remaps)
         if self.publisher:
             node.add_publisher(topic, self.message_type,
                                queue_size = self.queue_size,
@@ -136,8 +138,10 @@ class ServiceGenerator(BaseGenerator):
                                   remaps = node.remaps)
         service = resources.get_service(name)
         if service is None:
-            service = ROS.Service(name, message_type = self.message_type)
-            resources.register(service)
+            service = ROS.Service(self.name, ns = node.namespace,
+                                  private_ns = node.full_name,
+                                  message_type = self.message_type)
+            resources.register(service, remaps = node.remaps)
         if self.server:
             node.add_server(service, self.message_type, nesting = self.nesting)
             service.set_server(node, self.message_type, nesting = self.nesting)
