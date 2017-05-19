@@ -76,6 +76,7 @@ def post_analysis(iface):
                                                 cli[0].full_name)
             _type_check_topics(config)
             _check_disconnected_topics(config)
+            _check_queue_sizes(config)
     except Exception as e:
         print traceback.print_exc()
     if iface.state.builder.unknown_packages:
@@ -123,3 +124,29 @@ def _check_disconnected_topics(config):
                             topic.original_name, topic.full_name)
                 print "  but looks very similar to '{}' ('{}')".format(
                             other.full_name, other.original_name)
+
+
+def _check_queue_sizes(config):
+    for topic in config.resources.get_topics():
+        for sub in topic.subscribers:
+            if sub[2] is None:
+                continue
+            qi = sub[2]
+            if qi == 0:
+                print "[WARNING] Found a queue size of 0 on", sub[0].reference
+            sqo = 0
+            for pub in topic.publishers:
+                if pub[2] is None:
+                    continue
+                qo = pub[2]
+                if qo == 0:
+                    print "[WARNING] Found a queue size of 0 on", pub[0].reference
+                elif qo == 1:
+                    print ("[WARNING] {} is publishing with a queue of 1 on {}."
+                            " Messages may be dropped.".format(
+                            pub[0].reference, topic.full_name))
+                sqo += qo
+            if sqo > qi or qi <= len(topic.publishers):
+                print ("[WARNING] {} may not have a large enough queue on {}."
+                        " Messages may be dropped.".format(sub[0].reference,
+                        topic.full_name))
