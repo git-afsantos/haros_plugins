@@ -100,7 +100,6 @@ def _type_check_topics(config):
 def _check_disconnected_topics(config):
     topics = config.resources.get_topics()
     for i, topic in enumerate(topics):
-        visited.add(topic.full_name)
         if not topic.is_disconnected:
             continue
         for j in xrange(i + 1, len(topics)):
