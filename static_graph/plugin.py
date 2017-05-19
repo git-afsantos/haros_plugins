@@ -87,14 +87,16 @@ def _type_check_topics(config):
     for topic in config.resources.get_topics():
         for pub in topic.publishers:
             if pub[1] and pub[1] != topic.message_type:
-                print "[WARNING] Topic type mismatch on publisher", pub[0].reference
-                print "  expected:", topic.message_type
-                print "     found:", pub[1]
+                print "[WARNING] Type mismatch on", topic.full_name
+                print "  publisher:", pub[0].reference
+                print "   expected:", topic.message_type
+                print "      found:", pub[1]
         for sub in topic.subscribers:
             if sub[1] and sub[1] != topic.message_type:
-                print "[WARNING] Topic type mismatch on subscriber", sub[0].reference
-                print "  expected:", topic.message_type
-                print "     found:", sub[1]
+                print "[WARNING] Type mismatch on", topic.full_name
+                print "  subscriber:", sub[0].reference
+                print "    expected:", topic.message_type
+                print "       found:", sub[1]
 
 
 def _check_disconnected_topics(config):
@@ -107,16 +109,15 @@ def _check_disconnected_topics(config):
             test = other.is_disconnected
             test = test and len(topic.publishers) != len(other.publishers)
             test = test and topic.message_type == other.message_type
-            test = test 
             if test and (topic.full_name.endswith(other.name)
                          or other.full_name.endswith(topic.name)):
                 print "[WARNING] Possible topic naming mistake."
                 print "  Should '{}' and '{}' be the same?".format(
                             topic.full_name, other.full_name)
-            if test and (topic.original_name == other.original_name
-                         or topic.original_name.endswith(other.name)
-                         or other.original_name.endswith(topic.name)
-                         or topic.given_name == other.given_name):
+            elif test and (topic.original_name == other.original_name
+                           or topic.original_name.endswith(other.name)
+                           or other.original_name.endswith(topic.name)
+                           or topic.given_name == other.given_name):
                 print "[WARNING] Possible topic remapping mistake."
                 print "  '{}' was remapped to '{}'".format(
                             topic.original_name, topic.full_name)
