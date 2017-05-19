@@ -98,11 +98,12 @@ def _type_check_topics(config):
 
 
 def _check_disconnected_topics(config):
+    warns = []
     topics = config.resources.get_topics()
     for topic in topics:
         if topic.is_disconnected:
             for other in topics:
-                if other is topic:
+                if other is topic or (other, topic) in warns:
                     continue
                 test = other.is_disconnected
                 test = test and len(topic.publishers) != len(other.publishers)
@@ -110,13 +111,15 @@ def _check_disconnected_topics(config):
                 test = test and _names_are_similar(topic, other)
                 if test:
                     print "[WARNING] Possible naming mistake."
-                    print "  Topics {} and {} are similar and disconnected.".format(
+                    print "  Topics '{}' and '{}' are similar and disconnected.".format(
                                 topic.full_name, other.full_name)
+                    warns.append((topic, other))
 
 
 def _names_are_similar(r1, r2):
     return (r1.full_name.endswith(r2.name)
             or r2.full_name.endswith(r1.name)
+            or r1.original_name == r2.original_name
             or r1.original_name.endswith(r2.name)
             or r2.original_name.endswith(r1.name)
             or r1.given_name == r2.given_name)
