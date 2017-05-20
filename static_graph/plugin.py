@@ -50,6 +50,7 @@ def post_analysis(iface):
             if not config:
                 print "Invalid launch file", launch_file.get_path()
                 continue
+            config.scope_id = launch_file.id
             print config.name
             print "Depends on packages:"
             print "   ", ", ".join(config.pkg_depends)
@@ -74,9 +75,9 @@ def post_analysis(iface):
                 for cli in node.clients:
                     print "    cli{} {}".format("*" if cli[2] else "",
                                                 cli[0].full_name)
-            _type_check_topics(config)
-            _check_disconnected_topics(config)
-            _check_queue_sizes(config)
+            _type_check_topics(iface, config)
+            _check_disconnected_topics(iface, config)
+            _check_queue_sizes(iface, config)
     except Exception as e:
         print traceback.print_exc()
     if iface.state.builder.unknown_packages:
@@ -84,23 +85,33 @@ def post_analysis(iface):
         print "Unknown packages", iface.state.builder.unknown_packages
 
 
-def _type_check_topics(config):
+def _type_check_topics(iface, config):
     for topic in config.resources.get_topics():
         for pub in topic.publishers:
             if pub[1] and pub[1] != topic.message_type:
+                msg = ("Expected type '{}' but found type '{}' "
+                       "on publisher {}.".format(topic.message_type,
+                       pub[1], pub[0].reference))
+                iface.report_file_violation("msgTypeCheck", msg,
+                                            config.scope_id)
                 print "[WARNING] Type mismatch on", topic.full_name
                 print "  publisher:", pub[0].reference
                 print "   expected:", topic.message_type
                 print "      found:", pub[1]
         for sub in topic.subscribers:
             if sub[1] and sub[1] != topic.message_type:
+                msg = ("Expected type '{}' but found type '{}' "
+                       "on subscriber {}.".format(topic.message_type,
+                       pub[1], pub[0].reference))
+                iface.report_file_violation("msgTypeCheck", msg,
+                                            config.scope_id)
                 print "[WARNING] Type mismatch on", topic.full_name
                 print "  subscriber:", sub[0].reference
                 print "    expected:", topic.message_type
                 print "       found:", sub[1]
 
 
-def _check_disconnected_topics(config):
+def _check_disconnected_topics(iface, config):
     topics = config.resources.get_topics()
     for i, topic in enumerate(topics):
         if not topic.is_disconnected:
@@ -112,27 +123,36 @@ def _check_disconnected_topics(config):
             test = test and topic.message_type == other.message_type
             if test and (topic.full_name.endswith(other.name)
                          or other.full_name.endswith(topic.name)):
+                msg = "Should '{}' and '{}' be the same?".format(
+                        topic.full_name, other.full_name)
+                iface.report_file_violation("disconnectedTopics", msg,
+                                            config.scope_id)
                 print "[WARNING] Possible topic naming mistake."
-                print "  Should '{}' and '{}' be the same?".format(
-                            topic.full_name, other.full_name)
+                print msg
             elif test and (topic.original_name == other.original_name
                            or topic.original_name.endswith(other.name)
                            or other.original_name.endswith(topic.name)
                            or topic.given_name == other.given_name):
+                msg = ("'{}' was remapped to '{}' "
+                       "but looks very similar to '{}' ('{}')".format(
+                            topic.original_name, topic.full_name,
+                            other.full_name, other.original_name))
+                iface.report_file_violation("disconnectedTopics", msg,
+                                            config.scope_id)
                 print "[WARNING] Possible topic remapping mistake."
-                print "  '{}' was remapped to '{}'".format(
-                            topic.original_name, topic.full_name)
-                print "  but looks very similar to '{}' ('{}')".format(
-                            other.full_name, other.original_name)
+                print msg
 
 
-def _check_queue_sizes(config):
+def _check_queue_sizes(iface, config):
     for topic in config.resources.get_topics():
         for sub in topic.subscribers:
             if sub[2] is None:
                 continue
             qi = sub[2]
             if qi == 0:
+                iface.report_file_violation("infiniteQueue",
+                        "Found a queue size of 0 on " + sub[0].reference,
+                        config.scope_id)
                 print "[WARNING] Found a queue size of 0 on", sub[0].reference
             sqo = 0
             for pub in topic.publishers:
@@ -140,13 +160,22 @@ def _check_queue_sizes(config):
                     continue
                 qo = pub[2]
                 if qo == 0:
+                    iface.report_file_violation("infiniteQueue",
+                        "Found a queue size of 0 on " + pub[0].reference,
+                        config.scope_id)
                     print "[WARNING] Found a queue size of 0 on", pub[0].reference
                 elif qo == 1:
-                    print ("[WARNING] {} is publishing with a queue of 1 on {}."
-                            " Messages may be dropped.".format(
+                    msg = ("{} is publishing with a queue of 1 on {}. "
+                           "Messages may be dropped.".format(
                             pub[0].reference, topic.full_name))
+                    iface.report_file_violation("smallQueueSizes",
+                                                msg, config.scope_id)
+                    print "[WARNING]", msg
                 sqo += qo
             if sqo > qi or qi <= len(topic.publishers):
-                print ("[WARNING] {} may not have a large enough queue on {}."
+                msg = ("{} may not have a large enough queue on {}."
                         " Messages may be dropped.".format(sub[0].reference,
                         topic.full_name))
+                iface.report_file_violation("smallQueueSizes",
+                                            msg, config.scope_id)
+                print "[WARNING]", msg

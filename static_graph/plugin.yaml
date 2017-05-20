@@ -4,4 +4,49 @@ name: static_graph
 version: 0.1
 languages:
     - launch
+rules:
+    msgTypeCheck:
+        name:           Message Type Mismatch
+        scope:          function
+        description:    Message types must match on both communication ends.
+        tags:
+            - warning
+            - ros
+            - ros-comm
+            - type-checking
+            - configuration
+    disconnectedTopics:
+        name:           Possible Topic Naming Mistake
+        scope:          file
+        description:    Two disconnected topics look very similar. Maybe they were meant to be the same.
+        tags:
+            - warning
+            - ros
+            - ros-comm
+            - topics
+            - naming
+            - remappings
+            - configuration
+    smallQueueSizes:
+        name:           Use Adequate Queue Sizes
+        scope:          function
+        description:    Queue sizes should be adequate for their purpose.
+        tags:
+            - warning
+            - ros
+            - ros-comm
+            - topics
+            - queue-size
+            - configuration
+    infiniteQueue:
+        name:           Use of Infinite Topic Queue
+        scope:          function
+        description:    Infinite queue sizes (0) are not recommended.
+        tags:
+            - warning
+            - ros
+            - ros-comm
+            - topics
+            - queue-size
+            - configuration
 metrics: {}
