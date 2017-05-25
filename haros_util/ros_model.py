@@ -90,7 +90,7 @@ class Service(Resource):
 
     def set_server(self, node, message_type, nesting = 0,
                    global_ref = False, file = None, line = None):
-        self.server = (node, message_type, nesting, file, line
+        self.server = (node, message_type, nesting, file, line,
                        global_ref)
 
     def add_client(self, node, message_type, nesting = 0,
