@@ -99,28 +99,28 @@ def _basic_checks(iface, config):
         for pub in topic.publishers:
             if pub[3] > 0:
                 msg = ("Found an advertise under {} control flow "
-                       "structures. [{}, ln {}]".format(pub[3]),
-                       pub[4] or "?", pub[5] or "?")
+                       "structures. [{}, ln {}]".format(pub[3],
+                       pub[4] or "?", pub[5] or "?"))
                 iface.report_file_violation("control_nesting", msg,
                                             config.scope_id)
                 print "[WARNING] advertise control nesting:", pub[3]
             if pub[6]:
                 msg = ("Found a global name. [{}, ln {}]".format(
-                       pub[4] or "?", pub[5] or "?")
+                       pub[4] or "?", pub[5] or "?"))
                 iface.report_file_violation("global_names", msg,
                                             config.scope_id)
                 print "[WARNING] advertise with global name"
         for sub in topic.subscribers:
             if sub[3] > 0:
                 msg = ("Found a subscribe under {} control flow "
-                       "structures. [{}, ln {}]".format(sub[3]),
-                       sub[4] or "?", sub[5] or "?")
+                       "structures. [{}, ln {}]".format(sub[3],
+                       sub[4] or "?", sub[5] or "?"))
                 iface.report_file_violation("control_nesting", msg,
                                             config.scope_id)
                 print "[WARNING] subscribe control nesting:", sub[3]
             if sub[6]:
                 msg = ("Found a global name. [{}, ln {}]".format(
-                       sub[4] or "?", sub[5] or "?")
+                       sub[4] or "?", sub[5] or "?"))
                 iface.report_file_violation("global_names", msg,
                                             config.scope_id)
                 print "[WARNING] subscribe with global name"
