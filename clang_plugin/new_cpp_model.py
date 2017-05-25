@@ -32,6 +32,9 @@ class CppEntity(object):
     def __init__(self, scope, parent):
         self.scope = scope
         self.parent = parent
+        self.file = None
+        self.line = None
+        self.column = None
 
     def walk_preorder(self):
         yield self
@@ -940,6 +943,9 @@ class CppExpressionBuilder(CppEntityBuilder):
             cppobj = CppReference(self.scope, self.parent,
                                   self.name, self.result)
             cppobj.parenthesis = self.parenthesis
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             ref = self.cursor.get_definition()
             if ref:
                 data.reference(ref.get_usr(), cppobj)
@@ -970,6 +976,9 @@ class CppExpressionBuilder(CppEntityBuilder):
         if not name is None:
             cppobj = CppOperator(self.scope, self.parent, name, self.result)
             cppobj.parenthesis = self.parenthesis
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             builders = [CppExpressionBuilder(c, self.scope, cppobj) \
                         for c in self.cursor.get_children()]
             return (cppobj, builders)
@@ -984,6 +993,9 @@ class CppExpressionBuilder(CppEntityBuilder):
             if self.name:
                 cppobj = CppFunctionCall(self.scope, self.parent,
                                          self.name, self.result)
+                cppobj.file = self.file
+                cppobj.line = self.line
+                cppobj.column = self.column
                 cppobj.parenthesis = self.parenthesis
     # ----- this is still tentative -------------------------------------------
                 tokens = [t.spelling for t in self.cursor.get_tokens()]
@@ -1032,6 +1044,9 @@ class CppExpressionBuilder(CppEntityBuilder):
         elif self.cursor.kind == CK.CXX_DELETE_EXPR:
             cppobj = CppFunctionCall(self.scope, self.parent,
                                      "delete", self.result)
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             cppobj.parenthesis = self.parenthesis
             ref = next(self.cursor.get_children())
             builder = CppExpressionBuilder(ref, self.scope, cppobj)
@@ -1044,6 +1059,9 @@ class CppExpressionBuilder(CppEntityBuilder):
                 and not next(self.cursor.get_children(), None):
             cppobj = CppDefaultArgument(self.scope, self.parent, self.result)
             cppobj.parenthesis = self.parenthesis
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             return (cppobj, ())
         return None
 
@@ -1147,6 +1165,9 @@ class CppStatementBuilder(CppEntityBuilder):
             expression = result[0]
             cppobj = CppExpressionStatement(self.scope, self.parent,
                                             expression = expression)
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             if isinstance(expression, CppExpression):
                 expression.parent = cppobj
             result = (cppobj, result[1])
@@ -1155,6 +1176,9 @@ class CppStatementBuilder(CppEntityBuilder):
     def _build_declarations(self, data):
         if self.cursor.kind == CK.DECL_STMT:
             cppobj = CppDeclaration(self.scope, self.parent)
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             original = self.cursor
             self.parent = cppobj
             builders = []
@@ -1188,15 +1212,24 @@ class CppStatementBuilder(CppEntityBuilder):
     def _build_jump_statement(self):
         if self.cursor.kind == CK.RETURN_STMT:
             cppobj = CppJumpStatement(self.scope, self.parent, "return")
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             expression  = next(self.cursor.get_children(), None)
             builders = [CppExpressionBuilder(expression, self.scope, cppobj)] \
                         if expression else ()
             return (cppobj, builders)
         if self.cursor.kind == CK.BREAK_STMT:
             cppobj = CppJumpStatement(self.scope, self.parent, "break")
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             return (cppobj, ())
         if self.cursor.kind == CK.CONTINUE_STMT:
             cppobj = CppJumpStatement(self.scope, self.parent, "continue")
+            cppobj.file = self.file
+            cppobj.line = self.line
+            cppobj.column = self.column
             return (cppobj, ())
         return None
 
@@ -1213,6 +1246,9 @@ class CppStatementBuilder(CppEntityBuilder):
 
     def _build_while_statement(self):
         cppobj = CppLoop(self.scope, self.parent, "while")
+        cppobj.file = self.file
+        cppobj.line = self.line
+        cppobj.column = self.column
         builders = []
         children = list(self.cursor.get_children())
         assert len(children) >= 2
@@ -1230,6 +1266,9 @@ class CppStatementBuilder(CppEntityBuilder):
             http://en.cppreference.com/w/cpp/language/for
         """
         cppobj = CppLoop(self.scope, self.parent, "for")
+        cppobj.file = self.file
+        cppobj.line = self.line
+        cppobj.column = self.column
         builders = []
         children = list(self.cursor.get_children())
         assert len(children) >= 1
@@ -1267,6 +1306,9 @@ class CppStatementBuilder(CppEntityBuilder):
 
     def _build_do_statement(self):
         cppobj = CppLoop(self.scope, self.parent, "do")
+        cppobj.file = self.file
+        cppobj.line = self.line
+        cppobj.column = self.column
         builders = []
         children = list(self.cursor.get_children())
         assert len(children) >= 2
@@ -1278,6 +1320,9 @@ class CppStatementBuilder(CppEntityBuilder):
 
     def _build_if_statement(self):
         cppobj = CppConditional(self.scope, self.parent)
+        cppobj.file = self.file
+        cppobj.line = self.line
+        cppobj.column = self.column
         builders = []
         children = list(self.cursor.get_children())
         assert len(children) >= 2
@@ -1306,6 +1351,9 @@ class CppStatementBuilder(CppEntityBuilder):
             This way, a jump can be represented as a parent plus index.
         """
         cppobj = CppSwitch(self.scope, self.parent)
+        cppobj.file = self.file
+        cppobj.line = self.line
+        cppobj.column = self.column
         builders = []
         children = list(self.cursor.get_children())
         assert len(children) >= 2

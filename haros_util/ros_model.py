@@ -30,17 +30,25 @@ class Node(Resource):
     def reference(self):
         return self.package + "/" + self.node_type
 
-    def add_publisher(self, topic, message_type, queue_size = 0, nesting = 0):
-        self.publishers.append((topic, message_type, queue_size, nesting))
+    def add_publisher(self, topic, message_type, queue_size = 0, nesting = 0,
+                      global_ref = False, file = None, line = None):
+        self.publishers.append((topic, message_type, queue_size, nesting,
+                                file, line, global_ref))
 
-    def add_subscriber(self, topic, message_type, queue_size = 0, nesting = 0):
-        self.subscribers.append((topic, message_type, queue_size, nesting))
+    def add_subscriber(self, topic, message_type, queue_size = 0, nesting = 0,
+                       global_ref = False, file = None, line = None):
+        self.subscribers.append((topic, message_type, queue_size, nesting,
+                                 file, line, global_ref))
 
-    def add_server(self, service, message_type, nesting = 0):
-        self.servers.append((service, message_type, nesting))
+    def add_server(self, service, message_type, nesting = 0,
+                   global_ref = False, file = None, line = None):
+        self.servers.append((service, message_type, nesting, file, line,
+                             global_ref))
 
-    def add_client(self, service, message_type, nesting = 0):
-        self.clients.append((service, message_type, nesting))
+    def add_client(self, service, message_type, nesting = 0,
+                   global_ref = False, file = None, line = None):
+        self.clients.append((service, message_type, nesting, file, line,
+                             global_ref))
 
 
 class Topic(Resource):
@@ -56,11 +64,15 @@ class Topic(Resource):
         s = len(self.subscribers)
         return p + s > 0 and (p == 0 or s == 0)
 
-    def add_publisher(self, node, message_type, queue_size = 0, nesting = 0):
-        self.publishers.append((node, message_type, queue_size, nesting))
+    def add_publisher(self, node, message_type, queue_size = 0, nesting = 0,
+                      global_ref = False, file = None, line = None):
+        self.publishers.append((node, message_type, queue_size, nesting,
+                                file, line, global_ref))
 
-    def add_subscriber(self, node, message_type, queue_size = 0, nesting = 0):
-        self.subscribers.append((node, message_type, queue_size, nesting))
+    def add_subscriber(self, node, message_type, queue_size = 0, nesting = 0,
+                       global_ref = False, file = None, line = None):
+        self.subscribers.append((node, message_type, queue_size, nesting,
+                                 file, line, global_ref))
 
 
 class Service(Resource):
@@ -76,11 +88,15 @@ class Service(Resource):
         c = len(self.clients)
         return s + c > 0 and (s == 0 or c == 0)
 
-    def set_server(self, node, message_type, nesting = 0):
-        self.server = (node, message_type, nesting)
+    def set_server(self, node, message_type, nesting = 0,
+                   global_ref = False, file = None, line = None):
+        self.server = (node, message_type, nesting, file, line
+                       global_ref)
 
-    def add_client(self, node, message_type, nesting = 0):
-        self.clients.append((node, message_type, nesting))
+    def add_client(self, node, message_type, nesting = 0,
+                   global_ref = False, file = None, line = None):
+        self.clients.append((node, message_type, nesting, file, line,
+                             global_ref))
 
 
 class Parameter(Resource):
@@ -231,6 +247,10 @@ def transform_name(name, ns = "/", private_ns = "", remaps = None):
     if remaps:
         return remaps.get(name, name)
     return name
+
+
+def is_global_name(name):
+    return name and name[0] == "/"
 
 
 ###############################################################################

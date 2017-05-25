@@ -39,6 +39,9 @@ class BaseGenerator(object):
         self.namespace      = namespace
         self.message_type = self._extract_message_type(call)
         self.nesting = get_control_depth(call, recursive = True)
+        self.file = call.file
+        self.line = call.line
+        self.is_global = ROS.is_global_name(name)
 
     def _extract_name(self, call):
         name = resolve_expression(call.arguments[0])
@@ -97,17 +100,25 @@ class TopicGenerator(BaseGenerator):
         if self.publisher:
             node.add_publisher(topic, self.message_type,
                                queue_size = self.queue_size,
-                               nesting = self.nesting)
+                               nesting = self.nesting,
+                               file = self.file, line = self.line,
+                               global_ref = self.is_global)
             topic.add_publisher(node, self.message_type,
                                 queue_size = self.queue_size,
-                                nesting = self.nesting)
+                                nesting = self.nesting,
+                                file = self.file, line = self.line,
+                                global_ref = self.is_global)
         else:
             node.add_subscriber(topic, self.message_type,
                                 queue_size = self.queue_size,
-                                nesting = self.nesting)
+                                nesting = self.nesting,
+                                file = self.file, line = self.line,
+                                global_ref = self.is_global)
             topic.add_subscriber(node, self.message_type,
                                  queue_size = self.queue_size,
-                                 nesting = self.nesting)
+                                 nesting = self.nesting,
+                                 file = self.file, line = self.line,
+                                 global_ref = self.is_global)
         return topic
 
     def _extract_queue_size(self, call):
@@ -143,11 +154,19 @@ class ServiceGenerator(BaseGenerator):
                                   message_type = self.message_type)
             resources.register(service, remaps = node.remaps)
         if self.server:
-            node.add_server(service, self.message_type, nesting = self.nesting)
-            service.set_server(node, self.message_type, nesting = self.nesting)
+            node.add_server(service, self.message_type, nesting = self.nesting,
+                            file = self.file, line = self.line,
+                            global_ref = self.is_global)
+            service.set_server(node, self.message_type, nesting = self.nesting,
+                               file = self.file, line = self.line,
+                               global_ref = self.is_global)
         else:
-            node.add_client(service, self.message_type, nesting = self.nesting)
-            service.add_client(node, self.message_type, nesting = self.nesting)
+            node.add_client(service, self.message_type, nesting = self.nesting,
+                            file = self.file, line = self.line,
+                            global_ref = self.is_global)
+            service.add_client(node, self.message_type, nesting = self.nesting,
+                               file = self.file, line = self.line,
+                               global_ref = self.is_global)
         return service
 
 

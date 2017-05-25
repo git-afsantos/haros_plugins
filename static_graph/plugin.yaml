@@ -5,7 +5,7 @@ version: 0.1
 languages:
     - launch
 rules:
-    msgTypeCheck:
+    msg_type_check:
         name:           Message Type Mismatch
         scope:          function
         description:    Message types must match on both communication ends.
@@ -15,7 +15,7 @@ rules:
             - ros-comm
             - type-checking
             - configuration
-    disconnectedTopics:
+    disconnected_topics:
         name:           Possible Topic Naming Mistake
         scope:          file
         description:    Two disconnected topics look very similar. Maybe they were meant to be the same.
@@ -27,7 +27,7 @@ rules:
             - naming
             - remappings
             - configuration
-    smallQueueSizes:
+    small_queue_sizes:
         name:           Use Adequate Queue Sizes
         scope:          function
         description:    Queue sizes should be adequate for their purpose.
@@ -38,7 +38,7 @@ rules:
             - topics
             - queue-size
             - configuration
-    infiniteQueue:
+    infinite_queue:
         name:           Use of Infinite Topic Queue
         scope:          function
         description:    Infinite queue sizes (0) are not recommended.
@@ -49,4 +49,35 @@ rules:
             - topics
             - queue-size
             - configuration
+    unknown_packages:
+        name:           Use of Unknown Packages
+        scope:          file
+        description:    Some packages are referenced, but not part of the analysis corpus.
+        tags:
+            - warning
+            - haros
+            - packages
+            - unknown-references
+            - configuration
+    control_nesting:
+        name:           Primitives Under Control Flow
+        scope:          file
+        description:    ROS-comm primitives inside control flow structures may not be executed.
+        tags:
+            - warning
+            - haros
+            - ros-comm
+            - topics
+            - control-flow
+    global_names:
+        name:           Use of Global Names
+        scope:          file
+        description:    Referencing ROS resources by global name should be avoided.
+        tags:
+            - warning
+            - ros
+            - ros-comm
+            - topics
+            - names
+            - global-names
 metrics: {}
