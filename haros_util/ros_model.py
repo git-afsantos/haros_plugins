@@ -204,8 +204,9 @@ class ResourceGraph(object):
 # A configuration becomes invalid if there are unknown references.
 
 class Configuration(object):
-    def __init__(self, name, env, resources = None):
+    def __init__(self, name, package, env, resources = None):
         self.name = name
+        self.package = package
         self.environment = env
         self.resources = ResourceGraph() if resources is None else resources
         self.valid = True

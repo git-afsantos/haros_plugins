@@ -256,6 +256,7 @@ class ConfigurationBuilder(object):
             return None
         self.launch_files.add(path)
         config = ROS.Configuration(path.replace(CWS, ""),
+                                   launch_file.package.id,
                                    self.environment)
         self._config = config
         analyser = LaunchFileAnalyser(self.environment, finder,
@@ -270,6 +271,7 @@ class ConfigurationBuilder(object):
             if ref[0] == "pkg":
                 self.unknown_packages.add(ref[1])
         config.pkg_depends.update(merged_launch.pkg_depends)
+        config.env_depends.update(merged_launch.env_depends)
         config.valid = not bool(merged_launch.unknown)
         self._config = None
         return config

@@ -60,6 +60,7 @@ def post_analysis(iface):
             _type_check_topics(iface, config)
             _check_disconnected_topics(iface, config)
             _check_queue_sizes(iface, config)
+            iface.register_configuration(config)
     except Exception as e:
         print traceback.print_exc()
     if iface.state.builder.unknown_packages:
