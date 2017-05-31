@@ -107,12 +107,15 @@ class LaunchFileAnalyser(object):
         ns = attrib.get("ns")
         nodelet = False
 
+        if argv:
+            argv = argv.split()
         if pkg == "nodelet":
-            if argv.startswith("load "):
+            if argv[0] == "load":
                 nodelet = True
-                ss = argv.split()[1].split("/")
+                ss = argv[1].split("/")
                 pkg = ss[0]
                 ntype = ss[1]
+                argv = argv[2:]
 
         # create a scope for the private namespace of the node
         self._scope = self._scope.node_scope(name, pkg, ntype, nodelet,
