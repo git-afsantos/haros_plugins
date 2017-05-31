@@ -255,7 +255,7 @@ class ConfigurationBuilder(object):
         if path in self.launch_files:
             return None
         self.launch_files.add(path)
-        config = ROS.Configuration(path.replace(CWS, ""),
+        config = ROS.Configuration(launch_file.name.replace(".launch", ""),
                                    launch_file.package.id,
                                    self.environment)
         self._config = config
