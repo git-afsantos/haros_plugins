@@ -1,5 +1,9 @@
 
 ###
+# standard packages
+import yaml
+
+###
 # third-party packages
 import rosgraph.names
 
@@ -91,11 +95,58 @@ class LaunchNode(ROS.Node):
 
 
 class LaunchParameter(ROS.Parameter):
-    def __init__(self, name, ptype, value,
-                 ns = "/", private_ns = "", conditions = None):
+    def __init__(self, name, ptype, value, ns = "/", private_ns = "",
+                 node_param = False, scope_private = False, conditions = None):
+        given_name = name
+        if node_param and name[0] != "~" and name[0] != "/":
+            name = "~" + name
+        if isinstance(value, basestring):
+            value = self._convert_value(value, ptype)
         ROS.Parameter.__init__(self, name, ptype, value, ns, private_ns)
+        self.given_name = given_name
+        self.node_param = node_param
+        self.scope_private = scope_private # declared with "~" outside of <node>
         self.conditions = conditions if not conditions is None else ()
                           # if/unless conditions to launch
+
+
+    # as seen in roslaunch code, sans a few details
+    def _convert_value(value, ptype):
+        if ptype is None:
+            # attempt numeric conversion
+            try:
+                if "." in value:
+                    return float(value)
+                else:
+                    return int(value)
+            except ValueError as e:
+                pass
+            # bool
+            lval = value.lower()
+            if lval == "true" or lval == "false":
+                return self._convert_value(value, "bool")
+            # string
+            return value
+        elif ptype == "str" or ptype == "string":
+            return value
+        elif ptype == "int":
+            return int(value)
+        elif ptype == "double":
+            return float(value)
+        elif ptype == "bool" or ptype == "boolean":
+            value = value.lower().strip()
+            if value == "true" or value == "1":
+                return True
+            elif value == "false" or value == "0":
+                return False
+            raise ValueError("{} is not a '{}' type".format(value, ptype))
+        elif ptype == "yaml":
+            try:
+                return yaml.load(value)
+            except yaml.parser.ParserError as e:
+                raise ValueError(e)
+        else:
+            raise ValueError("Unknown type '{}'".format(ptype))
 
 
 class LaunchResourceGraph(object):
@@ -156,6 +207,7 @@ class LaunchScope(object):
         self.anonymous          = anonymous or {}
         self.node = None        # associated node
         self.conditions = []    # unknown values on which this depends
+        self.parameters = []    # private, to be passed on to nodes
 
     def get_arg(self, arg, default = None):
         value = self.launch.arguments.get(arg)
@@ -197,6 +249,7 @@ class LaunchScope(object):
                             anonymous = self.anonymous, ns = ns)
         self.children.append(scope)
         scope.conditions.extend(self.conditions)
+        scope.parameters.extend(self.parameters)
         if not condition is True:
             scope.conditions.append(condition)
         return scope
@@ -204,12 +257,14 @@ class LaunchScope(object):
     def node_scope(self, name, pkg, ntype, args, nodelet, ns, condition):
         # creates a node under the current scope and also the
         # associated node scope.
-        # we need to share the remap dict between node and scope
+        # TODO check if remaps fict really needs to be a copy
+        #       instead of using the dict from child scope
         scope = self.child_scope(condition = condition)
         node = LaunchNode(self.launch, name, pkg, ntype, nodelet = nodelet,
                           args = args, ns = self._namespace(ns),
                           remaps = dict(self.resources.enabled.remaps),
                           conditions = scope.conditions)
+        scope.node = node
         if condition is False or False in self.conditions:
             self.resources.disabled.register(node)
         elif self.conditions or isinstance(condition, Condition):
@@ -217,7 +272,21 @@ class LaunchScope(object):
         else:
             self.resources.enabled.register(node)
             self.launch.nodes.append(node)
-        scope.node = node
+            for param in self.parameters:
+                conditions = list(param.conditions)
+                conditions.extend(self.conditions)
+                param = LaunchParameter(param.given_name, param.type,
+                                        param.value, ns = scope.namespace,
+                                        private_ns = scope.private_ns,
+                                        node_param = True,
+                                        scope_private = True,
+                                        conditions = conditions)
+                if False in conditions:
+                    self.resources.disabled.register(param)
+                elif conditions:
+                    self.resources.conditional.append(param)
+                else:
+                    self.resources.enabled.register(param)
         self.launch.pkg_depends.add(pkg)
         return scope
 
@@ -232,8 +301,23 @@ class LaunchScope(object):
             if not is_default or prev is None:
                 args[name] = value
 
-    def create_param(self, name, value, condition):
-        pass
+    def create_param(self, name, ptype, value, condition):
+        conditions = list(self.conditions)
+        if not condition is True:
+            conditions.append(condition)
+        param = LaunchParameter(name, ptype, value, ns = self.namespace,
+                                private_ns = self.private_ns,
+                                node_param = not self.node is None,
+                                conditions = conditions)
+        if not self.node and name[0] == "~":
+            self.parameters.append(param)
+        else:
+            if False in conditions:
+                self.resources.disabled.register(param)
+            elif conditions:
+                self.resources.conditional.append(param)
+            else:
+                self.resources.enabled.register(param)
 
     def set_remap(self, source, target, condition):
         source = ROS.resolve_name(source, self.namespace, self.private_ns)

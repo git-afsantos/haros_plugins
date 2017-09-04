@@ -211,10 +211,17 @@ class LaunchFileAnalyser(object):
     def _param_tag(self, tag, private = False):
         attrib = self._attributes(tag.attrib, LaunchFileAnalyser._PARAM_ATTRS)
         self.stats.param_tags += 1
+        name = attrib["name"]
+        ptype = attrib.get("type")
         if attrib.get("command"):
+            value = attrib.get("command") # TODO
             self.stats.cmd_params += 1
         elif attrib.get("textfile") or attrib.get("binfile"):
+            value = attrib.get("textfile", attrib.get("binfile"))
             self.stats.file_params += 1
+        else:
+            value = attrib["value"]
+        self._scope.create_param(name, ptype, value, attrib["if"])
 
     _ROSPARAM_ATTRS = ("command", "file", "param", "ns", "subst_value")
 
