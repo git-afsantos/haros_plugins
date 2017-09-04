@@ -44,6 +44,15 @@ def package_analysis(iface, package):
             if analyser.stats.unknown_pkgs or not merged_launch.valid:
                 iface.state.fstats[launch_file] = None
             iface.state.pkg_depends[launch_file] = merged_launch.pkg_depends
+            for param in analyser.resources.enabled.get_params():
+                if param.given_name[0] == "/":
+                    msg = "Parameter {}".format(param.given_name)
+                    iface.report_file_violation("global_names", msg, sf.id)
+                if (param.given_name[0] == "~" and param.node_param
+                        and not param.scope_private):
+                    msg = "Parameter {}".format(param.given_name)
+                    iface.report_file_violation("redundant_private_names",
+                                                msg, sf.id)
 
 
 def post_analysis(iface):

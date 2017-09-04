@@ -4,4 +4,27 @@ name: launch_analyser
 version: 0.1
 languages:
     - launch
+rules:
+    global_names:
+        name:           Global Names Are Discouraged
+        scope:          file
+        description:    Globally specified names should be avoided. 
+        tags:
+            - warning
+            - ros
+            - ros-comm
+            - names
+            - global-names
+            - launch
+    redundant_private_names:
+        name:           Redundant Private Name Specifier
+        scope:          file
+        description:    Use of private name specifier when the name is implicitly private. 
+        tags:
+            - warning
+            - ros
+            - ros-comm
+            - names
+            - private-names
+            - launch
 metrics: {}
