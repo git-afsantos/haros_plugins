@@ -257,7 +257,7 @@ class LaunchScope(object):
     def node_scope(self, name, pkg, ntype, args, nodelet, ns, condition):
         # creates a node under the current scope and also the
         # associated node scope.
-        # TODO check if remaps fict really needs to be a copy
+        # TODO check if remaps dict really needs to be a copy
         #       instead of using the dict from child scope
         scope = self.child_scope(condition = condition)
         node = LaunchNode(self.launch, name, pkg, ntype, nodelet = nodelet,
