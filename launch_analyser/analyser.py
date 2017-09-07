@@ -216,8 +216,11 @@ class LaunchFileAnalyser(object):
         if attrib.get("command"):
             value = attrib.get("command") # TODO
             self.stats.cmd_params += 1
-        elif attrib.get("textfile") or attrib.get("binfile"):
-            value = attrib.get("textfile", attrib.get("binfile"))
+        elif attrib.get("binfile"):
+            value = attrib.get("binfile")
+            self.stats.file_params += 1
+        elif attrib.get("textfile"):
+            value = self._scope.get_text_file(attrib["textfile"])
             self.stats.file_params += 1
         else:
             value = attrib["value"]

@@ -242,6 +242,13 @@ class LaunchScope(object):
             self.anonymous[name] = value
             return value
 
+    def get_text_file(self, path, default = None):
+        if os.path.isfile(path):
+            with open(path, "r") as f:
+                return f.read()
+        self.launch.unknown.append(("file", path))
+        return default
+
     def child_scope(self, ns = None, condition = True):
         ns = self._namespace(ns)
         scope = LaunchScope(self.launch, self, self.environment,
