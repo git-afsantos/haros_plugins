@@ -964,6 +964,7 @@ class _FunctionState(object):
       # base_trigger = self._NORMAL_TRIGGER
     # trigger = base_trigger * 2**_VerboseLevel()
 
+    error_level = 5
     # if self.lines_in_function > trigger:
       # error_level = int(math.log(self.lines_in_function / base_trigger, 2))
       # # 50 => 0, 100 => 1, 200 => 2, 400 => 3, 800 => 4, 1600 => 5, ...

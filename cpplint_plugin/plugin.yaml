@@ -49,7 +49,7 @@ rules:
     header_guard_format:
         name:           Header Guard Format
         scope:          file
-        description:    The format of the symbol name should be <PACKAGE>_<PATH>_<FILE>_H.
+        description:    The format of the symbol name should be &lt;PACKAGE&gt;_&lt;PATH&gt;_&lt;FILE&gt;_H.
         tags:
             - code-standards
             - header
@@ -60,7 +60,7 @@ rules:
     header_guard_close:
         name:           Header Guard Must Close
         scope:          file
-        description:    The format of the guard's end should be "#endif  // <PROJECT>_<PATH>_<FILE>_H_" or "#endif  /* <PROJECT>_<PATH>_<FILE>_H_ */".
+        description:    The format of the guard's end should be "#endif  // &lt;PROJECT&gt;_&lt;PATH&gt;_&lt;FILE&gt;_H_" or "#endif  /* &lt;PROJECT&gt;_&lt;PATH&gt;_&lt;FILE&gt;_H_ */".
         tags:
             - code-standards
             - header
@@ -159,7 +159,7 @@ rules:
             - google-cpp
     namespace_end_comment:
         name:           End of Namespace Comment
-        scope:          namespace
+        scope:          file
         description:    Namespaces should have a comment at the end.
         tags:
             - code-standards
@@ -230,7 +230,7 @@ rules:
     deprecated_operators:
         name:           Do Not Use Deprecated Operators
         scope:          file
-        description:    Do not use non-standard or deprecated operators (e.g. >? and <?).
+        description:    Do not use non-standard or deprecated operators (e.g. &gt;? and &lt;?).
         tags:
             - code-standards
             - invalid-code
@@ -899,7 +899,7 @@ rules:
             - google-cpp
     namespace_indent:
         name:           No Namespace Indentation
-        scope:          namespace
+        scope:          file
         description:    Do not indent within a namespace.
         tags:
             - code-standards
