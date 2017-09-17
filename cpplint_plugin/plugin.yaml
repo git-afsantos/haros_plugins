@@ -1,0 +1,936 @@
+%YAML 1.1
+---
+name: cpplint_plugin
+version: 0.1
+languages:
+    - cpp
+rules:
+    line_endings:
+        name:           Mixed Line Endings
+        scope:          file
+        description:    No file should mix LF and CRLF line endings.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - newline
+    comments_must_end:
+        name:           Multi-line Comments Must End
+        scope:          file
+        description:    Multi-line comments must have a terminator.
+        tags:
+            - code-standards
+            - comments
+            - invalid-code
+            - google-cpp
+    no_copyright:
+        name:           No Copyright Statement
+        scope:          file
+        description:    Every source and header file must contain a license and copyright statement at the beginning of the file.
+        tags:
+            - code-standards
+            - comments
+            - license
+            - copyright
+            - google-cpp
+            - ros
+    header_guard:
+        name:           No Header Guard
+        scope:          file
+        description:    All headers must be protected against multiple inclusion by #ifndef guards.
+        tags:
+            - code-standards
+            - header
+            - header-guard
+            - preprocessor
+            - google-cpp
+            - ros
+            - ros-cpp
+    header_guard_format:
+        name:           Header Guard Format
+        scope:          file
+        description:    The format of the symbol name should be <PACKAGE>_<PATH>_<FILE>_H.
+        tags:
+            - code-standards
+            - header
+            - header-guard
+            - preprocessor
+            - ros
+            - ros-cpp
+    header_guard_close:
+        name:           Header Guard Must Close
+        scope:          file
+        description:    The format of the guard's end should be "#endif  // <PROJECT>_<PATH>_<FILE>_H_" or "#endif  /* <PROJECT>_<PATH>_<FILE>_H_ */".
+        tags:
+            - code-standards
+            - header
+            - header-guard
+            - preprocessor
+            - google-cpp
+    include_own_header:
+        name:           Include Your Own header
+        scope:          file
+        description:    In general, every .cc file should have an associated .h file.
+        tags:
+            - code-standards
+            - header
+            - include
+            - preprocessor
+            - google-cpp
+    non_ascii:
+        name:           Non-ASCII Characters
+        scope:          file
+        description:    Non-ASCII characters should be rare, and must use UTF-8 formatting.
+        tags:
+            - code-standards
+            - formatting
+            - character-encoding
+            - google-cpp
+    newline_terminator:
+        name:           Newline at End of File
+        scope:          file
+        description:    Files should end with a newline character.
+        tags:
+            - code-standards
+            - formatting
+            - newline
+            - end-of-file
+            - google-cpp
+            - ros
+            - ros-cpp
+    complex_comment:
+        name:           Complex Multi-line Comments and Strings
+        scope:          file
+        description:    Strings and /**/-comments should not extend beyond one line.
+        tags:
+            - code-standards
+            - comments
+            - strings
+            - multiline-comments
+            - multiline-strings
+            - google-cpp
+    thread_safe_functions:
+        name:           Avoid Thread-Unsafe Functions
+        scope:          file
+        description:    Avoid using thread-unsafe functions, when thread-safe variants are available.
+        tags:
+            - code-standards
+            - multi-threading
+            - thread-safety
+            - google-cpp
+    logging_levels:
+        name:           Logging Levels
+        scope:          file
+        description:    Use VLOG with a numeric argument.
+        tags:
+            - code-standards
+            - logging
+            - library
+            - google-cpp
+    invalid_increment:
+        name:           Invalid Increment Form
+        scope:          file
+        description:    Do not use the invalid increment form *count++.
+        tags:
+            - code-standards
+            - increment
+            - pointer
+            - invalid-code
+            - google-cpp
+    disallow_macro:
+        name:           Disallow Macro
+        scope:          class
+        description:    If copying and assignment are disabled with a macro such as DISALLOW_COPY_AND_ASSIGN, it should be at the end of the private section, and should be the last thing in the class.
+        tags:
+            - code-standards
+            - macros
+            - class
+            - constructors
+            - google-cpp
+    close_brace_alignment:
+        name:           Closing Curly Brace Alignment
+        scope:          file
+        description:    Closing brace should be aligned with the beginning of class or structure.
+        tags:
+            - code-standards
+            - formatting
+            - curly-braces
+            - indentation
+            - google-cpp
+    namespace_end_comment:
+        name:           End of Namespace Comment
+        scope:          namespace
+        description:    Namespaces should have a comment at the end.
+        tags:
+            - code-standards
+            - formatting
+            - comments
+            - namespace
+            - google-cpp
+            - ros
+            - ros-cpp
+    indent_access_mod:
+        name:           Indent Access Modifiers
+        scope:          class
+        description:    Access modifiers should be indented by one space.
+        tags:
+            - code-standards
+            - formatting
+            - indentation
+            - access-modifiers
+            - google-cpp
+    string_format:
+        name:           Deprecated String Formatting
+        scope:          file
+        description:    Do not use deprecated or unconventional string formattings.
+        tags:
+            - code-standards
+            - strings
+            - string-formatting
+            - deprecation
+            - invalid-code
+            - google-cpp
+    invalid_escape:
+        name:           Invalid Escape Sequences
+        scope:          file
+        description:    Do not use invalid escape sequences.
+        tags:
+            - code-standards
+            - strings
+            - escape-sequences
+            - invalid-code
+            - google-cpp
+    storage_before_type:
+        name:           Storage Class Before Type
+        scope:          file
+        description:    Storage class should come before the type.
+        tags:
+            - code-standards
+            - invalid-code
+            - storage-class
+            - google-cpp
+    text_after_endif:
+        name:           No Text After ENDIF
+        scope:          file
+        description:    Uncommented text after #endif is non-standard. Use a comment instead.
+        tags:
+            - code-standards
+            - preprocessor
+            - invalid-code
+            - google-cpp
+    invalid_forward_declaration:
+        name:           Invalid Forward Declaration
+        scope:          file
+        description:    Inner-style forward declarations are invalid.
+        tags:
+            - code-standards
+            - invalid-code
+            - forward-declaration
+            - google-cpp
+    deprecated_operators:
+        name:           Do Not Use Deprecated Operators
+        scope:          file
+        description:    Do not use non-standard or deprecated operators (e.g. >? and <?).
+        tags:
+            - code-standards
+            - invalid-code
+            - deprecation
+            - operators
+            - google-cpp
+    const_string_ref:
+        name:           Const String References
+        scope:          file
+        description:    Do not use const string& members. Use pointers or simple constants instead.
+        tags:
+            - code-standards
+            - strings
+            - references
+            - constants
+            - google-cpp
+    explicit_constructors:
+        name:           Make Constructors Explicit
+        scope:          class
+        description:    Zero-parameter constructors, single-parameter constructors and constructors callable with one argument should be marked explicit.
+        tags:
+            - code-standards
+            - explicit
+            - constructors
+            - google-cpp
+    non_explicit_constructors:
+        name:           Do Not Make Constructors Explicit
+        scope:          class
+        description:    Constructors that require multiple arguments should not be marked explicit.
+        tags:
+            - code-standards
+            - explicit
+            - constructors
+            - google-cpp
+    whitespace_after_paren:
+        name:           No Whitespace After Parenthesis
+        scope:          file
+        description:    Except in if/for/while/switch, there should never be space immediately inside parens (eg "f( 3, 4 )"). We make an exception for nested parens ( (a+b) + c ).
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - parenthesis
+            - google-cpp
+    whitespace_before_paren:
+        name:           No Whitespace Before Parenthesis
+        scope:          file
+        description:    There should never be a space before a ( when it is a function argument. Closing parenthesis should not be preceded only by whitespaces.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - parenthesis
+            - google-cpp
+    whitespace_before_comments:
+        name:           Whitespace Before Comments
+        scope:          file
+        description:    At least two spaces is best between code and comments.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - comments
+            - google-cpp
+    whitespace_before_comment_text:
+        name:           Whitespace Before Comment Text
+        scope:          file
+        description:    Use one space before comment text.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - comments
+            - google-cpp
+    todo_format:
+        name:           TODO Comment Format
+        scope:          file
+        description:    "To-do comments should look like '// TODO(my_username): Stuff.'."
+        tags:
+            - code-standards
+            - formatting
+            - comments
+            - todo-comment
+            - google-cpp
+    disallow_in_private:
+        name:           Disallow Macro In Private
+        scope:          class
+        description:    DISALLOW macros must be in the private section.
+        tags:
+            - code-standards
+            - macros
+            - class
+            - private
+            - google-cpp
+    blank_code_line:
+        name:           No Blank Lines In Code Blocks
+        scope:          function
+        description:    Leave no redundant blank lines in code blocks.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - functions
+            - code-blocks
+            - google-cpp
+    whitespace_before_brackets:
+        name:           Whitespace Before Brackets
+        scope:          function
+        description:    You shouldn't have spaces before your brackets, except maybe after 'delete []' or 'return []() {};'
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - brackets
+            - google-cpp
+    whitespace_colon:
+        name:           Whitespace Around Colon
+        scope:          function
+        description:    Colons in range-based for loops should be preceeded and followed by a whitespace.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - colon
+            - for-loop
+            - range-based-for
+            - google-cpp
+    whitespace_assign:
+        name:           Whitespace Around Assignment
+        scope:          function
+        description:    Assignment operators should be preceeded and followed by whitespace.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - assignment
+            - google-cpp
+    whitespace_binary_op:
+        name:           Whitespace Around Binary Operator
+        scope:          function
+        description:    Binary operators should be preceeded and followed by whitespace.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - binary-operator
+            - google-cpp
+    whitespace_unary_op:
+        name:           Whitespace Around Unary Operator
+        scope:          function
+        description:    Unary operators should have no whitespace around them.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - unary-operator
+            - google-cpp
+    whitespace_before_paren_if:
+        name:           Whitespace Before Parenthesis
+        scope:          function
+        description:    There should be a space before a ( when it is preceeded by an if, switch, for or while.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - parenthesis
+            - google-cpp
+    whitespace_inside_paren:
+        name:           Whitespace Inside Parenthesis
+        scope:          function
+        description:    Whitespace inside parenthesis should be consistent, and should consist of either zero or one space.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - parenthesis
+            - google-cpp
+    whitespace_after_comma:
+        name:           Whitespace After Comma
+        scope:          function
+        description:    There should be a space after a comma.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - comma
+            - google-cpp
+    whitespace_after_semicolon:
+        name:           Whitespace After Semicolon
+        scope:          function
+        description:    There should be a space after a semicolon, if it does not end the line.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - semicolon
+            - google-cpp
+    whitespace_open_brace:
+        name:           Whitespace Before Opening Curly Brace
+        scope:          file
+        description:    Except after an opening parenthesis, or after another opening brace (in case of an initializer list, for instance), you should have spaces before your braces.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - curly-braces
+            - google-cpp
+    whitespace_close_brace:
+        name:           Whitespace After Closing Curly Brace
+        scope:          file
+        description:    There should be a space after a closing brace, if it does not end the line (for instance, '} else {').
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - curly-braces
+            - google-cpp
+    whitespace_before_semicolon:
+        name:           Whitespace Before Semicolon
+        scope:          function
+        description:    Don't leave spaces before a semicolon at the end of a line.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - semicolon
+            - google-cpp
+    empty_statement:
+        name:           Empty Semicolon Statement
+        scope:          function
+        description:    Don't use a semicolon to denote an empty statement. Use {} instead.
+        tags:
+            - code-standards
+            - formatting
+            - empty-statement
+            - semicolon
+            - empty-block
+            - google-cpp
+    rvalue_ref:
+        name:           Avoid Rvalue References
+        scope:          function
+        description:    Do not use RValue references.
+        tags:
+            - code-standards
+            - invalid-code
+            - rvalue-reference
+            - google-cpp
+    blank_before_section:
+        name:           Blank Lines Before Section
+        scope:          class
+        description:    The line before an access modifier (public, private, protected) should be blank, unless it is the beginning of the class.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - access-modifiers
+            - google-cpp
+    opening_curly_brace:
+        name:           Opening Curly Brace
+        scope:          file
+        description:    The open curly brace should almost never be on its own line.
+        tags:
+            - code-standards
+            - formatting
+            - curly-braces
+            - google-cpp
+    else_line:
+        name:           Else Statement Line
+        scope:          function
+        description:    The else statement should be on the same line as the preceeding closing brace.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - if-else
+            - curly-braces
+            - google-cpp
+    else_braces:
+        name:           Else Braces
+        scope:          function
+        description:    If an else has a brace on one side, it should have it on both.
+        tags:
+            - code-standards
+            - formatting
+            - if-else
+            - curly-braces
+            - google-cpp
+    else_if_else_line:
+        name:           Single Else-If Else Line
+        scope:          function
+        description:    The else clause of an else-if clause should be on its own line.
+        tags:
+            - code-standards
+            - formatting
+            - if-else
+            - google-cpp
+    do_while_line:
+        name:           Single Do-While Line
+        scope:          function
+        description:    do/while clauses should not be on a single line.
+        tags:
+            - code-standards
+            - formatting
+            - do-while
+            - google-cpp
+    single_if_else:
+        name:           Single Statement If-Else
+        scope:          function
+        description:    There should not be more than one semicolon statement in a single-line if or else statement, unless it is part of a lambda expression, or the if/else body is enclosed in curly braces.
+        tags:
+            - code-standards
+            - formatting
+            - if-else
+            - single-line-statements
+            - google-cpp
+    if_else_indentation:
+        name:           Ambiguous If-Else Indentation
+        scope:          function
+        description:    Statements that are not part of an if body should have an indentation level equal to or less than the if statement.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - indentation
+            - if-else
+            - ambiguous-indentation
+            - google-cpp
+    closing_brace_line:
+        name:           Closing Curly Brace On Its Own Line
+        scope:          file
+        description:    The closing curly brace is always on its own line.
+        tags:
+            - code-standards
+            - formatting
+            - curly-braces
+            - ros
+            - ros-cpp
+    opening_brace_line:
+        name:           Opening Curly Brace On Its Own Line
+        scope:          file
+        description:    The open curly brace is always on its own line.
+        tags:
+            - code-standards
+            - formatting
+            - curly-braces
+            - ros
+            - ros-cpp
+    redundant_empty_statement:
+        name:           Redundant Empty Statement
+        scope:          function
+        description:    Do not use meaningless empty statements.
+        tags:
+            - code-standards
+            - empty-statement
+            - ambiguous-code
+            - google-cpp
+    check_eq:
+        name:           CHECK_EQ Instead of CHECK
+        scope:          function
+        description:    To check for equality, use CHECK_EQ(a, b) instead of CHECK(a == b).
+        tags:
+            - code-standards
+            - macros
+            - equality
+            - google-cpp
+    alternative_tokens:
+        name:           Alternative Tokens
+        scope:          function
+        description:    Do not use alternative tokens instead of operators (e.g. 'and', 'or').
+        tags:
+            - code-standards
+            - tokens
+            - alternative-tokens
+            - operators
+            - google-cpp
+    two_space_indent:
+        name:           Indent With 2 Whitespace
+        scope:          file
+        description:    Indent each block by 2 spaces. Never insert literal tab characters.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - indentation
+            - ros
+            - ros-cpp
+            - google-cpp
+    whitespace_end_line:
+        name:           Whitespace at the End of Line
+        scope:          function
+        description:    Do not leave whitespace at the end of a line.
+        tags:
+            - code-standards
+            - formatting
+            - whitespace
+            - google-cpp
+    max_line_length_80:
+        name:           Max. Line Length of 80
+        scope:          file
+        description:    No line should exceed 80 characters in length.
+        tags:
+            - code-standards
+            - formatting
+            - line-length
+            - google-cpp
+    max_line_length_120:
+        name:           Max. Line Length of 120
+        scope:          file
+        description:    No line should exceed 120 characters in length.
+        tags:
+            - code-standards
+            - formatting
+            - line-length
+            - ros
+            - ros-cpp
+    one_command_per_line:
+        name:           One Command Per Line
+        scope:          function
+        description:    Avoid more than one command per line.
+        tags:
+            - code-standards
+            - formatting
+            - google-cpp
+    dir_in_header:
+        name:           Include Directory in Header
+        scope:          file
+        description:    Include the directory when naming header files.
+        tags:
+            - code-standards
+            - naming
+            - headers
+            - include
+            - google-cpp
+    include_twice:
+        name:           Do Not Include Twice
+        scope:          file
+        description:    Do not include the same file twice.
+        tags:
+            - code-standards
+            - include
+            - headers
+            - preprocessor
+            - google-cpp
+    include_cpp:
+        name:           Do Not Include Non-header Files
+        scope:          file
+        description:    Do not include non-header files from other packages.
+        tags:
+            - code-standards
+            - include
+            - preprocessor
+            - implementation-files
+            - google-cpp
+    include_order:
+        name:           Include in Order
+        scope:          file
+        description:    Include files in alphabetical order, and in the following order. 1. preferred location 2. c system files 3. cpp system files 4. deprecated location 5. other headers
+        tags:
+            - code-standards
+            - include
+            - preprocessor
+            - formatting
+            - google-cpp
+    c_headers:
+        name:           Avoid C System Headers
+        scope:          file
+        description:    Do not include the C standard headers. Use the C++ headers instead.
+        tags:
+            - code-standards
+            - include
+            - headers
+            - preprocessor
+            - deprecation
+            - c
+            - hicpp
+    c_types:
+        name:           Do Not Use C Types
+        scope:          function
+        description:    Do not use the verboten C basic types.
+        tags:
+            - code-standards
+            - types
+            - deprecation
+            - google-cpp
+    unary_and:
+        name:           operator& Overload
+        scope:          file
+        description:    Do not use the unary operator&.
+        tags:
+            - code-standards
+            - operators
+            - overload
+            - google-cpp
+    if_line:
+        name:           If On Its Own Line
+        scope:          function
+        description:    An if should start on its own line. Avoid constructs such as '} if'.
+        tags:
+            - code-standards
+            - formatting
+            - if-else
+            - google-cpp
+    format_string_var:
+        name:           Avoid Format String Variables
+        scope:          function
+        description:    Avoid using variables as format string arguments. Use 'printf("%s", var)' instead.
+        tags:
+            - code-standards
+            - formatting
+            - strings
+            - potential-bugs
+            - google-cpp
+    using_directives:
+        name:           Avoid Namespace Using-Directives
+        scope:          file
+        description:    Do not use namespace using-directives. Use using-declarations instead.
+        tags:
+            - code-standards
+            - namespace
+            - using-directives
+            - using-declarations
+            - google-cpp
+            - hicpp
+            - misra-cpp
+    variable_length_array:
+        name:           Variable Length Arrays
+        scope:          file
+        description:    Do not use variable-length arrays.
+        tags:
+            - code-standards
+            - arrays
+            - variables
+            - constants
+            - google-cpp
+    unnamed_namespace:
+        name:           Unnamed Namespace
+        scope:          file
+        description:    Do not use unnamed namespaces in header files.
+        tags:
+            - code-standards
+            - namespace
+            - unnamed-namespace
+            - headers
+            - google-cpp
+    string_constants:
+        name:           C-style String Constants
+        scope:          file
+        description:    Use C-style strings for static and global string constants.
+        tags:
+            - code-standards
+            - strings
+            - constants
+            - google-cpp
+    snprintf_args:
+        name:           snprintf Arguments
+        scope:          function
+        description:    Avoid using literals as the second argument for snprintf.
+        tags:
+            - code-standards
+            - literals
+            - potential-bugs
+            - google-cpp
+    c_string_print:
+        name:           Avoid String Printing C Functions
+        scope:          function
+        description:    Avoid string printing C functions (sprintf, strcpy, strcat). Use snprintf instead.
+        tags:
+            - code-standards
+            - deprecation
+            - library
+            - strings
+            - google-cpp
+    non_const_ref:
+        name:           Avoid Non-const Reference Parameters
+        scope:          function
+        description:    Avoid non-const reference parameters. Use const or pointers.
+        tags:
+            - code-standards
+            - parameters
+            - const
+            - pointers
+            - references
+            - google-cpp
+    deprecated_casting:
+        name:           Deprecated Casting
+        scope:          function
+        description:    Don't use deprecated casting styles.
+        tags:
+            - code-standards
+            - casting
+            - deprecation
+            - google-cpp
+    dangerous_addresses:
+        name:           Avoid Dangerous Addresses
+        scope:          function
+        description:    Avoid using dangerous addresses, such as addresses from casts, or addresses dereferenced from casts.
+        tags:
+            - code-standards
+            - potential-bugs
+            - addresses
+            - casting
+            - google-cpp
+    unnamed_params:
+        name:           Avoid Unnamed Parameters
+        scope:          function
+        description:    All parameters should be named in a function.
+        tags:
+            - code-standards
+            - parameters
+            - functions
+            - naming
+            - google-cpp
+    include_what_you_use:
+        name:           Include What You Use
+        scope:          file
+        description:    Include all required headers for what you use.
+        tags:
+            - code-standards
+            - include
+            - headers
+            - preprocessor
+            - google-cpp
+    make_pair_template:
+        name:           make_pair Template
+        scope:          file
+        description:    Either omit template arguments from make_pair, or use pair directly, or construct a pair directly.
+        tags:
+            - code-standards
+            - cpp11
+            - compatibility
+            - templates
+            - pair
+            - google-cpp
+    default_lambda_captures:
+        name:           Default Lambda Captures
+        scope:          function
+        description:    Do not use default lambda captures.
+        tags:
+            - code-standards
+            - invalid-code
+            - lambda
+            - default-lambda-capture
+            - google-cpp
+    redundant_virtual_decl:
+        name:           Redundant Virtual Declaration
+        scope:          function
+        description:    Do not declare a function as both "virtual" and "override" or "final".
+        tags:
+            - code-standards
+            - functions
+            - virtual
+            - override
+            - final
+            - rendundancy
+            - google-cpp
+    redundant_override_decl:
+        name:           Redundant Override Declaration
+        scope:          function
+        description:    Do not declare a function as both "override" and "final".
+        tags:
+            - code-standards
+            - functions
+            - override
+            - final
+            - rendundancy
+            - google-cpp
+    namespace_indent:
+        name:           No Namespace Indentation
+        scope:          namespace
+        description:    Do not indent within a namespace.
+        tags:
+            - code-standards
+            - formatting
+            - indentation
+            - namespace
+            - google-cpp
+    unapproved_headers:
+        name:           Avoid Unapproved Headers
+        scope:          file
+        description:    Do not include unapproved C++11 headers.
+        tags:
+            - code-standards
+            - include
+            - headers
+            - preprocessor
+            - invalid-code
+            - cpp11
+            - google-cpp
+    unapproved_functions:
+        name:           Avoid Unapproved Classes and Functions
+        scope:          file
+        description:    Do not use unapproved C++11 classes and functions.
+        tags:
+            - code-standards
+            - class
+            - functions
+            - invalid-code
+            - cpp11
+            - google-cpp
+supported_rules:
+    - max_eloc_50
+    - max_eloc_70
+    - max_function_length_40
