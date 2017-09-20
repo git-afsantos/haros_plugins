@@ -111,7 +111,7 @@ class LaunchParameter(ROS.Parameter):
 
 
     # as seen in roslaunch code, sans a few details
-    def _convert_value(value, ptype):
+    def _convert_value(self, value, ptype):
         if ptype is None:
             # attempt numeric conversion
             try:
