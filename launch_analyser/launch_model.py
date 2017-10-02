@@ -151,43 +151,24 @@ class LaunchParameter(ROS.Parameter):
 
 class LaunchResourceGraph(object):
     def __init__(self, enabled = None, disabled = None, conditional = None):
-        self.enabled = ROS.ResourceGraph() if enabled is None else enabled
-        self.disabled = ROS.ResourceGraph() if disabled is None else disabled
-        self.conditional = [] if conditional is None else conditional
+        self.enabled        = enabled or ROS.ResourceGraph()
+        self.disabled       = disabled or ROS.ResourceGraph()
+        self.conditional    = conditional or ROS.ResourceGraph()
 
     def enabled_nodes(self, count = False):
         if count:
-            c = 0
-            for _, n in self.enabled.resources.iteritems():
-                if isinstance(n, LaunchNode):
-                    c += 1
-            return c
-        return [n for _, n in self.enabled.resources.iteritems() \
-                  if isinstance(n, LaunchNode)]
+            return self.enabled._count_all(LaunchNode)
+        return self.enabled._get_all(LaunchNode)
 
     def disabled_nodes(self, count = False):
         if count:
-            c = 0
-            for _, n in self.disabled.resources.iteritems():
-                if isinstance(n, LaunchNode):
-                    c += 1
-            return c
-        return [n for _, n in self.disabled.resources.iteritems() \
-                  if isinstance(n, LaunchNode)]
+            return self.disabled._count_all(LaunchNode)
+        return self.disabled._get_all(LaunchNode)
 
     def conditional_nodes(self, count = False):
         if count:
-            c = 0
-            for n in self.conditional:
-                if isinstance(n, LaunchNode):
-                    c += 1
-            return c
-        return [n for n in self.conditional if isinstance(n, LaunchNode)]
-
-    def child(self):
-        return LaunchResourceGraph(enabled = self.enabled.child(),
-                                   disabled = self.disabled.child(),
-                                   conditional = list(self.conditional))
+            return self.conditional._count_all(LaunchNode)
+        return self.conditional._get_all(LaunchNode)
 
 
 ###############################################################################
@@ -196,7 +177,7 @@ class LaunchResourceGraph(object):
 
 class LaunchScope(object):
     def __init__(self, launch, parent, environment, finder, resources,
-                 anonymous = None, ns = "/"):
+                 remaps = None, anonymous = None, ns = "/"):
         self.namespace = ns
         self.launch = launch    # launch file to which this belongs
         self.scope = parent     # parent scope
@@ -204,7 +185,8 @@ class LaunchScope(object):
         self.environment        = environment
         self.resource_finder    = finder
         self.resources          = resources
-        self.anonymous          = anonymous or {}
+        self.remaps             = remaps if not remaps is None else {}
+        self.anonymous          = anonymous if not anonymous is None else {}
         self.node = None        # associated node
         self.conditions = []    # unknown values on which this depends
         self.parameters = []    # private, to be passed on to nodes
@@ -252,7 +234,8 @@ class LaunchScope(object):
     def child_scope(self, ns = None, condition = True):
         ns = self._namespace(ns)
         scope = LaunchScope(self.launch, self, self.environment,
-                            self.resource_finder, self.resources.child(),
+                            self.resource_finder, self.resources,
+                            remaps = dict(self.remaps),
                             anonymous = self.anonymous, ns = ns)
         self.children.append(scope)
         scope.conditions.extend(self.conditions)
@@ -264,24 +247,22 @@ class LaunchScope(object):
     def node_scope(self, name, pkg, ntype, args, nodelet, ns, condition):
         # creates a node under the current scope and also the
         # associated node scope.
-        # TODO check if remaps dict really needs to be a copy
-        #       instead of using the dict from child scope
         scope = self.child_scope(condition = condition)
         node = LaunchNode(self.launch, name, pkg, ntype, nodelet = nodelet,
                           args = args, ns = self._namespace(ns),
-                          remaps = dict(self.resources.enabled.remaps),
+                          remaps = scope.remaps,
                           conditions = scope.conditions)
         scope.node = node
         if condition is False or False in self.conditions:
             self.resources.disabled.register(node)
         elif self.conditions or isinstance(condition, Condition):
-            self.resources.conditional.append(node)
+            self.resources.conditional.register(node)
         else:
             self.resources.enabled.register(node)
             self.launch.nodes.append(node)
             for param in self.parameters:
                 conditions = list(param.conditions)
-                conditions.extend(self.conditions)
+                conditions.extend(scope.conditions)
                 param = LaunchParameter(param.given_name, param.type,
                                         param.value, ns = scope.namespace,
                                         private_ns = scope.private_ns,
@@ -291,7 +272,7 @@ class LaunchScope(object):
                 if False in conditions:
                     self.resources.disabled.register(param)
                 elif conditions:
-                    self.resources.conditional.append(param)
+                    self.resources.conditional.register(param)
                 else:
                     self.resources.enabled.register(param)
         self.launch.pkg_depends.add(pkg)
@@ -322,26 +303,20 @@ class LaunchScope(object):
             if False in conditions:
                 self.resources.disabled.register(param)
             elif conditions:
-                self.resources.conditional.append(param)
+                self.resources.conditional.register(param)
             else:
                 self.resources.enabled.register(param)
 
     def set_remap(self, source, target, condition):
         source = ROS.resolve_name(source, self.namespace, self.private_ns)
         target = ROS.resolve_name(target, self.namespace, self.private_ns)
-        if condition is False:
+        if condition is False or False in self.conditions:
             self.resources.disabled.remap(source, target)
-        elif isinstance(condition, Condition):
-            self.resources.conditional.append((source, target))
+        elif isinstance(condition, Condition) or self.conditions:
+            self.resources.conditional.remap(source, target)
         else:
-            if False in self.conditions:
-                self.resources.disabled.remap(source, target)
-            elif self.conditions:
-                self.resources.conditional.append((source, target))
-            else:
-                self.resources.enabled.remap(source, target)
-                if self.node:
-                    self.node.remaps[source] = target
+            self.resources.enabled.remap(source, target)
+            self.remaps[source] = target
 
     @property
     def private_ns(self):

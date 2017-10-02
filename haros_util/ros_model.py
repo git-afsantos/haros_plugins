@@ -112,9 +112,9 @@ class Parameter(Resource):
 
 class ResourceGraph(object):
     def __init__(self, resources = None, remaps = None, collisions = None):
-        self.resources = resources if not resources is None else {}
-        self.remaps = remaps if not remaps is None else {}
+        self.resources  = resources if not resources is None else {}
         self.collisions = collisions if not collisions is None else {}
+        self.remaps     = remaps if not remaps is None else {}
 
     @property
     def n_collisions(self):
@@ -123,35 +123,44 @@ class ResourceGraph(object):
             n += len(values)
         return n
 
+    @property
+    def n_remaps(self):
+        n = 0
+        for name, values in self.remaps.iteritems():
+            n += len(values)
+        return n
+
     def get_node(self, name, remaps = False):
         return self._get(name, Node, remaps)
 
-    def get_nodes(self):
-        return self._get_all(Node)
+    def get_nodes(self, count = False):
+        return self._count_all(Node) if count else self._get_all(Node)
 
     def get_param(self, name, remaps = False):
         return self._get(name, Parameter, remaps)
 
-    def get_params(self):
-        return self._get_all(Parameter)
+    def get_params(self, count = False):
+        return self._count_all(Parameter) if count else self._get_all(Parameter)
 
     def get_topic(self, name, remaps = False):
         return self._get(name, Topic, remaps)
 
-    def get_topics(self):
-        return self._get_all(Topic)
+    def get_topics(self, count = False):
+        return self._count_all(Topic) if count else self._get_all(Topic)
 
     def get_service(self, name, remaps = False):
         return self._get(name, Service, remaps)
 
-    def get_services(self):
-        return self._get_all(Service)
+    def get_services(self, count = False):
+        return self._count_all(Service) if count else self._get_all(Service)
 
     def _get(self, name, cls, remaps):
         if isinstance(remaps, dict):
             name = remaps.get(name, name)
         elif remaps:
-            name = self.remaps.get(name, name)
+            values = self.remaps.get(name)
+            if values:
+                name = values[-1]
         r = self.resources.get(name)
         if r is None or isinstance(r, cls):
             return r
@@ -173,12 +182,27 @@ class ResourceGraph(object):
                     all.append(r)
         return all
 
-    def register(self, resource, remaps = None):
-        remaps = self.remaps if remaps is None else remaps
+    def _count_all(self, cls):
+        n = 0
+        for _, r in self.resources.iteritems():
+            if isinstance(r, cls):
+                n += 1
+        for _, rs in self.collisions.iteritems():
+            for r in rs:
+                if isinstance(r, cls):
+                    n += 1
+        return n
+
+    def register(self, resource, remaps = False):
         name = resource.full_name
-        if not isinstance(resource, Node):
+        if isinstance(remaps, dict):
             name = remaps.get(name, name)
             resource.full_name = name
+        elif remaps:
+            values = self.remaps.get(name)
+            if values:
+                name = values[-1]
+                resource.full_name = name
         resource.namespace = name.rsplit("/", 1)[0]
         if name in self.resources:
             if not name in self.collisions:
@@ -188,12 +212,9 @@ class ResourceGraph(object):
             self.resources[name] = resource
 
     def remap(self, source, target):
-        self.remaps[source] = target
-
-    def child(self):
-        return ResourceGraph(resources = self.resources,
-                             remaps = dict(self.remaps),
-                             collisions = self.collisions)
+        values = self.remaps.get(source, [])
+        values.append(target)
+        self.remaps[source] = values
 
 
 ###############################################################################
