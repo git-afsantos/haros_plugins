@@ -216,6 +216,43 @@ class ResourceGraph(object):
         values.append(target)
         self.remaps[source] = values
 
+    def remove_param(self, name, remaps = False):
+        if isinstance(remaps, dict):
+            name = remaps.get(name, name)
+        elif remaps:
+            values = self.remaps.get(name)
+            if values:
+                name = values[-1]
+    # ----- remove from collisions first to ease the shift
+    # ----- if it is in resources too
+        rs = self.collisions.get(name)
+        if rs:
+            i = len(rs) - 1
+            while i >= 0:
+                if isinstance(r, Parameter):
+                    del rs[i]
+                i -= 1
+            if not rs:
+                del self.collisions[name]
+        r = self.resources.get(name)
+        if isinstance(r, Parameter):
+            del self.resources[name]
+            rs = self.collisions.get(name)
+            if rs:
+                self.resources[name] = rs.pop(0)
+                if not rs:
+                    del self.collisions[name]
+
+    def merge(self, other):
+        for resource in other.resources.itervalues():
+            self.register(resource)
+        for resources in other.collisions.itervalues():
+            for resource in resources:
+                self.register(resource)
+        for source, targets in other.remaps.iteritems():
+            for target in targets:
+                self.remap(source, target)
+
 
 ###############################################################################
 # ROS Model - Configuration

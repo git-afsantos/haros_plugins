@@ -259,14 +259,21 @@ class ConfigurationBuilder(object):
                                    launch_file.package.id,
                                    self.environment)
         self._config = config
-        analyser = LaunchFileAnalyser(self.environment, finder,
-                                      resources = config.resources)
-        analyser.onNode.sub(self._onNode)
+        analyser = LaunchFileAnalyser(self.environment, finder)
     # ----- analyse will eventually call the event callbacks ------------------
         merged_launch = analyser.analyse(path)
     # -------------------------------------------------------------------------
         if not merged_launch.valid:
             return None
+    # ----- emulate roslaunch setup and node launch ---------------------------
+        for name in analyser.resources.deleted_params:
+            config.resources.remove_param(name)
+        config.resources.merge(analyser.resources.enabled)
+    # ----- nodes should only be analysed at this stage
+    # ----- roslaunch will only produce new nodes and parameters, no topics
+        for node in merged_launch.nodes:
+            self._onNode(node)
+    # -------------------------------------------------------------------------
         for ref in merged_launch.unknown:
             if ref[0] == "pkg":
                 self.unknown_packages.add(ref[1])

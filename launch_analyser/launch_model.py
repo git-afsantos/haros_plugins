@@ -154,6 +154,7 @@ class LaunchResourceGraph(object):
         self.enabled        = enabled or ROS.ResourceGraph()
         self.disabled       = disabled or ROS.ResourceGraph()
         self.conditional    = conditional or ROS.ResourceGraph()
+        self.deleted_params = []
 
     def enabled_nodes(self, count = False):
         if count:
