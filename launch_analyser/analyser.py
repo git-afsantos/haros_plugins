@@ -231,9 +231,21 @@ class LaunchFileAnalyser(object):
     def _rosparam_tag(self, tag, private = False):
         attrib = self._attributes(tag.attrib, LaunchFileAnalyser._ROSPARAM_ATTRS)
         self.stats.rosparam_tags += 1
-        cmd = attrib.get("command", "load")
-        if cmd == "load" and attrib.get("file"):
-            self.stats.file_params += 1
+        cmd     = attrib.get("command", "load")
+        ns      = attrib.get("ns")
+        path    = attrib.get("file")
+        param   = attrib.get("param")
+        if cmd == "load":
+            if path:
+                self.stats.file_params += 1
+                value = self._scope.get_text_file(path)
+            else:
+                value = tag.text
+                if attrib.get("subst_value", False):
+                    value = sub_args.parse(value, self._scope, UNKNOWN)
+            self._scope.create_rosparam(param, ns, value, attrib["if"])
+        elif cmd == "delete":
+            self._scope.remove_param(param, ns, attrib["if"])
 
     _GROUP_ATTRS = ("ns", "clear_params")
 

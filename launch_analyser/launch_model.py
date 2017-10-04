@@ -7,6 +7,8 @@ import yaml
 # third-party packages
 import rosgraph.names
 
+rosparam = None     # lazy-import global for yaml and rosparam
+
 ###
 # internal packages
 import haros_util.ros_model as ROS
@@ -298,15 +300,57 @@ class LaunchScope(object):
                                 private_ns = self.private_ns,
                                 node_param = not self.node is None,
                                 conditions = conditions)
+        params = self._unfold_param(param)
         if not self.node and name[0] == "~":
-            self.parameters.append(param)
+            for param in params:
+                self.parameters.append(param)
         else:
             if False in conditions:
-                self.resources.disabled.register(param)
+                for param in params:
+                    self.resources.disabled.register(param)
             elif conditions:
-                self.resources.conditional.register(param)
+                for param in params:
+                    self.resources.conditional.register(param)
             else:
-                self.resources.enabled.register(param)
+                for param in params:
+                    self.resources.enabled.register(param)
+
+    def create_rosparam(self, name, ns, value, condition):
+    # ---- lazy rosparam import as per the oringinal roslaunch code
+        global rosparam
+        if rosparam is None:
+            import rosparam
+        try:
+            value = yaml.load(value)
+        except yaml.MarkedYAMLError as e:
+            raise ValueError("invalid YAML")
+    # ----- try to use given name, namespace or both
+        if name:
+            if name[0] == "~":
+                # TODO check whether this is intended or a bug
+                raise ValueError("private name in rosparam")
+            if ns:
+                name = ROS.resolve_name(name, ns)
+        else:
+            if not isinstance(value, dict):
+                raise ValueError("'param' attribute must be set"
+                                 " for non-dictionary values")
+    # ----- this will unfold, so we can use namespace in place of a name
+            name = ns or self.private_ns
+        self.create_param(name, None, value, condition)
+
+    def remove_param(self, name, ns, condition):
+        if name[0] == "~":
+            # TODO check whether this is intended or a bug
+            raise ValueError("private name in rosparam")
+        ns = self._namespace(ns, private = True)
+        name = ROS.resolve_name(name, ns)
+        if condition is False or False in self.conditions:
+            return
+        elif isinstance(condition, Condition) or self.conditions:
+            return
+        else:
+            self.resources.deleted_params.append(name)
 
     def set_remap(self, source, target, condition):
         source = ROS.resolve_name(source, self.namespace, self.private_ns)
@@ -325,7 +369,50 @@ class LaunchScope(object):
             return self.node.full_name
         return self.namespace
 
-    def _namespace(self, ns):
+    def _namespace(self, ns, private = False):
         if ns is None:
-            return self.namespace
+            return self.namespace if not private else self.private_ns
+        if private:
+            return ROS.resolve_name(ns, self.private_ns)
         return ROS.resolve_name(ns, self.namespace)
+
+    def _unfold_param(self, param):
+        params = [param]
+        i = 0
+        while i < len(params):
+            p = params[i]
+            if isinstance(p.value, dict):
+                for key, value in p.value.iteritems():
+                    name = ROS.resolve_name(key, p.given_name)
+                    np = LaunchParameter(name, None, value, ns = self.namespace,
+                                         private_ns = self.private_ns,
+                                         node_param = not self.node is None,
+                                         conditions = list(p.conditions))
+                    params.append(np)
+                del params[i]
+                i -= 1
+            i += 1
+        return params
+
+
+
+if __name__ == "__main__":
+# ----- setup phase
+    launch = LaunchFile("tests.launch")
+    resources = LaunchResourceGraph()
+    scope = LaunchScope(launch, None, {}, None, resources)
+# ----- emulate launch file parsing
+    scope.create_param("myparam", None, "{a: 1, b: 2}", True)
+    scope.create_rosparam("some_param", "some_ns", "{a: 1, b: 2}", True)
+    scope.create_rosparam(None, "some_ns", "{c: 3, d: 4}", True)
+    scope = scope.node_scope("ficticontrol", "fictibot_controller",
+                             "fictibot_controller", [], False, None, True)
+    scope.create_rosparam("some_param", "some_ns", "{a: 1, b: 2}", True)
+    scope.create_rosparam("another_param", "some_ns", "2", True)
+    scope.create_rosparam(None, None, "{a: 1, b: 2}", True)
+    scope.create_rosparam(None, "some_ns", "{c: 3, d: 4}", True)
+# ----- print output
+    print "# RESOURCES"
+    for key, resource in scope.resources.enabled.resources.iteritems():
+        if isinstance(resource, LaunchParameter):
+            print " ", key + ":", repr(resource.value)
