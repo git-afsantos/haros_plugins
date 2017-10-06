@@ -403,16 +403,24 @@ if __name__ == "__main__":
     scope = LaunchScope(launch, None, {}, None, resources)
 # ----- emulate launch file parsing
     scope.create_param("myparam", None, "{a: 1, b: 2}", True)
-    scope.create_rosparam("some_param", "some_ns", "{a: 1, b: 2}", True)
-    scope.create_rosparam(None, "some_ns", "{c: 3, d: 4}", True)
-    scope = scope.node_scope("ficticontrol", "fictibot_controller",
-                             "fictibot_controller", [], False, None, True)
-    scope.create_rosparam("some_param", "some_ns", "{a: 1, b: 2}", True)
-    scope.create_rosparam("another_param", "some_ns", "2", True)
-    scope.create_rosparam(None, None, "{a: 1, b: 2}", True)
-    scope.create_rosparam(None, "some_ns", "{c: 3, d: 4}", True)
+    scope.create_rosparam("p", "ns", "{a: 1, b: 2}", True)
+    scope.create_rosparam("/p", "ns", "{a: 1, b: 2}", True)
+    scope.create_rosparam("/a", "ns", "1", True)
+    scope.create_rosparam("p", "/ns", "{c: 3}", True)
+    scope.create_rosparam(None, "ns", "{d: 4}", True)
+    scope.create_rosparam("p", "ns", "{/b: 2}", True)
+    scope = scope.node_scope("node", "package", "exec", [], False, None, True)
+    scope.create_rosparam("p", "ns", "{e: 5, f: 6}", True)
+    scope.create_rosparam("e", "ns", "5", True)
+    scope.create_rosparam(None, None, "{e: 5, f: 6}", True)
+    scope.create_rosparam(None, "ns", "{f: 6}", True)
+    scope.create_rosparam("/p", "ns", "{e: 5, f: 6}", True)
+    scope.create_rosparam("/e", "ns", "5", True)
+    scope.create_rosparam("p", "/ns", "{f: 6}", True)
+    scope.create_rosparam("p", "ns", "{/e: 5}", True)
 # ----- print output
-    print "# RESOURCES"
-    for key, resource in scope.resources.enabled.resources.iteritems():
+    print "# PARAMETERS"
+    for key in sorted(scope.resources.enabled.resources.iterkeys()):
+        resource = scope.resources.enabled.resources[key]
         if isinstance(resource, LaunchParameter):
             print " ", key + ":", repr(resource.value)
