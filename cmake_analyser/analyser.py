@@ -67,11 +67,12 @@ class BuildTarget(object):
                 replacement = None
                 parent = os.path.dirname(files[i])
                 prefix = files[i].rsplit(os.sep, 1)[-1]
-                for f in os.listdir(parent):
-                    joined = os.path.join(parent, f)
-                    if f.startswith(prefix) and os.path.isfile(joined):
-                        replacement = joined
-                        break
+                if os.path.isdir(parent):
+                    for f in os.listdir(parent):
+                        joined = os.path.join(parent, f)
+                        if f.startswith(prefix) and os.path.isfile(joined):
+                            replacement = joined
+                            break
                 if replacement:
                     files[i] = replacement
                 else:
