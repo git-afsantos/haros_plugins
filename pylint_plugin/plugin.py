@@ -22,23 +22,24 @@
 import subprocess
 
 def file_analysis(iface, scope):
-    cli = ["pylint", "--persistent=n", "--score=n",
+    cmd = ["pylint", "--persistent=n", "--score=n",
            '--msg-template="{line}:{obj}:({msg_id}) {msg}"',
            scope.get_path()]
-    try:
-        report = subprocess.check_output(cli, stderr = subprocess.STDOUT)
-        for item in report:
-            parts = item.split(":", 2)
-            if not len(parts) == 3:
-                continue
-            if not parts[0].isdigit():
-                continue
-            line = int(parts[0])
-            obj = parts[1] or None
-            msg = parts[2]
-            report_issue(iface, line, obj, msg)
-    except subprocess.CalledProcessError as e:
-        print "[PyLint Error]", e.output
+    # it is possible that we need cwd=parent_path, env=_get_env()
+    # see https://github.com/PyCQA/pylint/blob/master/pylint/epylint.py
+    process = subprocess.Popen(cmd, stdout = subprocess.PIPE,
+                               universal_newlines=True)
+    for report in process.stdout:
+        parts = report.split(":", 2)
+        if not len(parts) == 3:
+            continue
+        if not parts[0].isdigit():
+            continue
+        line = int(parts[0])
+        obj = parts[1] or None
+        msg = parts[2]
+        report_issue(iface, line, obj, msg)
+    process.wait()
 
 def report_issue(iface, line, obj, msg):
     msg_type = msg[1]
