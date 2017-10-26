@@ -28,6 +28,7 @@ def file_analysis(iface, scope):
     # it is possible that we need cwd=parent_path, env=_get_env()
     # see https://github.com/PyCQA/pylint/blob/master/pylint/epylint.py
     process = subprocess.Popen(cmd, stdout = subprocess.PIPE,
+                               stderr = subprocess.STDOUT,
                                universal_newlines=True)
     for report in process.stdout:
         parts = report.split(":", 2)
