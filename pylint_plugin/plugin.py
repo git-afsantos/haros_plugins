@@ -26,7 +26,7 @@ def file_analysis(iface, scope):
            '--msg-template="{line}:{obj}:({msg_id}) {msg}"',
            scope.get_path()]
     try:
-        report = subprocess.check_output(cli)
+        report = subprocess.check_output(cli, stderr = subprocess.STDOUT)
         for item in report:
             parts = item.split(":", 2)
             if not len(parts) == 3:
@@ -38,7 +38,7 @@ def file_analysis(iface, scope):
             msg = parts[2]
             report_issue(iface, line, obj, msg)
     except subprocess.CalledProcessError as e:
-        print e.output
+        print "[PyLint Error]", e.output
 
 def report_issue(iface, line, obj, msg):
     msg_type = msg[1]
