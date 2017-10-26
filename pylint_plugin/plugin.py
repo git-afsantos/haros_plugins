@@ -1,0 +1,56 @@
+
+#Copyright (c) 2017 Andre Santos
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
+import subprocess
+
+def file_analysis(iface, scope):
+    cli = ["pylint", "--persistent=n", "--score=n",
+           '--msg-template="{line}:{obj}:({msg_id}) {msg}"',
+           scope.get_path()]
+    try:
+        report = subprocess.check_output(cli)
+        for item in report:
+            parts = item.split(":", 2)
+            if not len(parts) == 3:
+                continue
+            if not parts[0].isdigit():
+                continue
+            line = int(parts[0])
+            obj = parts[1] or None
+            msg = parts[2]
+            report_issue(iface, line, obj, msg)
+    except subprocess.CalledProcessError as e:
+        print e.output
+
+def report_issue(iface, line, obj, msg):
+    msg_type = msg[1]
+    if msg_type == "R":
+        rule_id = "refactor"
+    elif msg_type == "C":
+        rule_id = "convention"
+    elif msg_type == "W":
+        rule_id = "warning"
+    elif msg_type == "E":
+        rule_id = "error"
+    else:
+        assert msg_type == "F"
+        rule_id = "fatal"
+    iface.report_violation(rule_id, msg, line = line, function = obj)
