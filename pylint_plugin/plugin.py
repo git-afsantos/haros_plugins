@@ -21,6 +21,8 @@
 
 import subprocess
 
+# TODO add a way to suppress certain message types, maybe a config file
+
 def file_analysis(iface, scope):
     cmd = ["pylint", "--persistent=n", "--score=n",
            '--msg-template="{line}:{obj}:({msg_id}) {msg}"',
@@ -37,12 +39,14 @@ def file_analysis(iface, scope):
         if not parts[0].isdigit():
             continue
         line = int(parts[0])
-        obj = parts[1] or None
+        obj_parts = parts[1].split(".", 1)
+        fun = obj_parts[-1] or None
+        cls = obj_parts[0] if len(obj_parts) > 1 else None
         msg = parts[2]
-        report_issue(iface, line, obj, msg)
+        report_issue(iface, line, fun, cls, msg)
     process.wait()
 
-def report_issue(iface, line, obj, msg):
+def report_issue(iface, line, fun, cls, msg):
     msg_type = msg[1]
     if msg_type == "R":
         rule_id = "refactor"
@@ -55,4 +59,5 @@ def report_issue(iface, line, obj, msg):
     else:
         assert msg_type == "F"
         rule_id = "fatal"
-    iface.report_violation(rule_id, msg, line = line, function = obj)
+    iface.report_violation(rule_id, msg, line = line,
+                           function = fun, class_ = cls)
