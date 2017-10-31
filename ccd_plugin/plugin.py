@@ -382,6 +382,13 @@ def file_analysis(iface, scope):
     with open(scope.get_path(), "r") as f:
         code = f.read().splitlines()
     (regularLines, comments) = CommentFilter().filterComments(code)
+    blanks = reduce(lambda n, s: n + (1 if not s or s.isspace() else 0),
+                    regularLines, 0)
+    sloc = scope.lines - blanks
+    iface.report_metric("sloc", sloc)
+    ncomments = sum(map(Comment.getLength, comments))
+    iface.report_metric("comments", ncomments)
+    iface.report_metric("comment_ratio", float(ncomments) / sloc)
     metrics = Halstead(regularLines)
     volume = metrics.getVolume()
     iface.report_metric("halstead_volume", volume)

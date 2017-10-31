@@ -27,6 +27,9 @@ supported_rules:
     - halstead_volume_above_8000
     - halstead_bugs_above_2
 supported_metrics:
+    - sloc
+    - comments
+    - comment_ratio
     - halstead_bugs
     - halstead_time
     - halstead_volume

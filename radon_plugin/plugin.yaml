@@ -37,6 +37,7 @@ supported_rules:
     - max_cyclomatic_complexity_10
     - max_cyclomatic_complexity_15
 supported_metrics:
+    - comments
     - comment_ratio
     - cyclomatic_complexity
     - halstead_bugs
