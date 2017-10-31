@@ -252,8 +252,11 @@ class CommentFilter:
         self.inMultilineComment = False
         self.currentComment = Comment()
         self.lineNumber = 0
+        self.blankLines = 0
     
         for line in source:
+            if (not line or line.isspace()) and not self.inMultilineComment:
+                self.blankLines += 1
             self.currentLine = []        
             while line:
                 line = self.reduceLine(line)
@@ -381,10 +384,9 @@ def unzero(v):
 def file_analysis(iface, scope):
     with open(scope.get_path(), "r") as f:
         code = f.read().splitlines()
-    (regularLines, comments) = CommentFilter().filterComments(code)
-    blanks = reduce(lambda n, s: n + (1 if not s or s.isspace() else 0),
-                    regularLines, 0)
-    sloc = scope.lines - blanks
+    com_filter = CommentFilter()
+    (regularLines, comments) = com_filter.filterComments(code)
+    sloc = scope.lines - com_filter.blankLines
     iface.report_metric("sloc", sloc)
     ncomments = sum(map(Comment.getLength, comments))
     iface.report_metric("comments", ncomments)
