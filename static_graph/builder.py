@@ -6,10 +6,10 @@ import os
 ###
 # internal packages
 import haros_util.ros_model as ROS
-from clang_plugin.new_cpp_model import CppAstParser, CppQuery, \
-                                        CppFunctionCall, CppDefaultArgument, \
-                                        CppOperator, resolve_reference, \
-                                        resolve_expression, get_control_depth
+from bonsai.cpp.model import CppFunctionCall, CppDefaultArgument, CppOperator
+from bonsai.analysis import CodeQuery, resolve_reference, \
+                            resolve_expression, get_control_depth
+from bonsai.cpp.clang_parser import CppAstParser
 from cmake_analyser.analyser import CMakeAnalyser
 from launch_analyser.analyser import LaunchFileAnalyser
 
@@ -30,7 +30,7 @@ MAGICK_INCLUDE  = "/usr/include/ImageMagick"
 class BaseGenerator(object):
     def __init__(self, namespace, call):
         name = self._extract_name(call)
-        if namespace:
+        if namespace and not name.startswith("/"):
             if namespace[-1].isalpha():
                 name = namespace + "/" + name
             else:
@@ -315,19 +315,19 @@ class ConfigurationBuilder(object):
             if gs is None:
                 self._gen_entry.append(ErrorGenerator("no compile commands for file " + f))
     # ----- queries after parsing, since global scope is reused ---------------
-        for call in (CppQuery(parser.global_scope).all_calls
+        for call in (CodeQuery(parser.global_scope).all_calls
                        .where_name("advertise")
                        .where_result("ros::Publisher").get()):
             self._onRosPrimitive(call, TopicGenerator)
-        for call in (CppQuery(parser.global_scope).all_calls
+        for call in (CodeQuery(parser.global_scope).all_calls
                        .where_name("subscribe")
                        .where_result("ros::Subscriber").get()):
             self._onRosPrimitive(call, TopicGenerator)
-        for call in (CppQuery(parser.global_scope).all_calls
+        for call in (CodeQuery(parser.global_scope).all_calls
                        .where_name("advertiseService")
                        .where_result("ros::ServiceServer").get()):
             self._onRosPrimitive(call, ServiceGenerator)
-        for call in (CppQuery(parser.global_scope).all_calls
+        for call in (CodeQuery(parser.global_scope).all_calls
                        .where_name("serviceClient")
                        .where_result("ros::ServiceClient").get()):
             self._onRosPrimitive(call, ServiceGenerator)
