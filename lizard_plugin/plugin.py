@@ -24,7 +24,7 @@
 import lizard
 
 def file_analysis(iface, scope):
-    metrics = lizard.analyze_file(scope.get_path())
+    metrics = lizard.analyze_file(scope.path)
     iface.report_metric("ploc", metrics.nloc)
     if metrics.nloc > 400:
         iface.report_violation("max_file_length_400",

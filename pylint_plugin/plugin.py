@@ -26,7 +26,7 @@ import subprocess
 def file_analysis(iface, scope):
     cmd = ["pylint", "--persistent=n", "--score=n",
            '--msg-template="{line}:{obj}:({msg_id}) {msg}"',
-           scope.get_path()]
+           scope.path]
     # it is possible that we need cwd=parent_path, env=_get_env()
     # see https://github.com/PyCQA/pylint/blob/master/pylint/epylint.py
     process = subprocess.Popen(cmd, stdout = subprocess.PIPE,

@@ -29,7 +29,7 @@ from radon.raw import analyze
 
 
 def file_analysis(iface, scope):
-    with open(scope.get_path(), "r") as f:
+    with open(scope.path, "r") as f:
         code = f.read()
     cc = analyse_cc(iface, code)
     lloc, ratio = analyse_raw_metrics(iface, code)
