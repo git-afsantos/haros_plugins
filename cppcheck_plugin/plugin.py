@@ -87,16 +87,16 @@ def handle_report(iface, files, error):
     rule_id = error.get("id")
     if rule_id in RULES:
         location = error.find("location")
-        file_id = files.get(location.get("file", default = ""))
-        if file_id:
+        source_file = files.get(location.get("file", default = ""))
+        if source_file:
             line = int(location.get("line", default = "0"))
             msg = error.get("verbose", default = error.get("msg"))
-            iface.report_file_violation(rule_id, msg, file_id, line = line)
+            iface.report_violation(rule_id, msg, scope = source_file, line = line)
 
 
 def file_mapping(pkg):
     files = {}
     for f in pkg.source_files:
         if f.language == "cpp":
-            files[f.get_path()] = f.id
+            files[f.path] = f
     return files
