@@ -63,7 +63,7 @@ RULES = {
 
 def package_analysis(iface, scope):
     FNULL   = open(os.devnull, "w")
-    output  = open(scope.name + ".xml", "w")
+    output  = open(scope.id + ".xml", "w")
     try:
         subprocess.call(["cppcheck", "--xml-version=2", "--enable=all",
                             "--rule-file=" + iface.get_file("rules.xml"),
@@ -74,7 +74,7 @@ def package_analysis(iface, scope):
         output.close()
     files   = file_mapping(scope)
     try:
-        xml     = ET.parse(scope.name + ".xml").getroot()
+        xml     = ET.parse(scope.id + ".xml").getroot()
         errors  = xml.find("errors")
         for error in errors:
             handle_report(iface, files, error)
@@ -87,16 +87,16 @@ def handle_report(iface, files, error):
     rule_id = error.get("id")
     if rule_id in RULES:
         location = error.find("location")
-        file_id = files.get(location.get("file", default = ""))
-        if file_id:
+        source_file = files.get(location.get("file", default = ""))
+        if source_file:
             line = int(location.get("line", default = "0"))
             msg = error.get("verbose", default = error.get("msg"))
-            iface.report_file_violation(rule_id, msg, file_id, line = line)
+            iface.report_violation(rule_id, msg, scope = source_file, line = line)
 
 
 def file_mapping(pkg):
     files = {}
     for f in pkg.source_files:
         if f.language == "cpp":
-            files[f.path] = f.full_name
+            files[f.path] = f
     return files

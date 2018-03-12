@@ -25,7 +25,8 @@ MI_PARAMETERS = ("lloc", "sloc", "ploc", "cyclomatic_complexity", "comment_ratio
                  "comments", "halstead_volume")
 
 class Maintainability(object):
-    def __init__(self):
+    def __init__(self, scope):
+        self.scope = scope
         self.mi = None
         self.lloc = None
         self.sloc = None
@@ -37,13 +38,13 @@ class Maintainability(object):
 
     def compute(self):
         self._prepare()
-        if not self._has_lloc():
+        if not self._has_lloc() or self.lloc <= 0:
             return None
         if not self._has_ratio():
             return None
         if self.cc == 0:
             return None
-        if self.hvol is None:
+        if not self.hvol or self.hvol <= 0:
             return None
         sloc_scale = math.log(self.lloc)
         volume_scale = math.log(self.hvol)
@@ -93,7 +94,7 @@ def process_file_metric(iface, datum):
     if not metric in MI_PARAMETERS and metric != "maintainability_index":
         return
     if not datum.scope.id in iface.state:
-        iface.state[datum.scope.id] = Maintainability()
+        iface.state[datum.scope.id] = Maintainability(datum.scope)
     mi = iface.state[datum.scope.id]
     if metric == "lloc":
         mi.lloc = datum.value
@@ -118,8 +119,10 @@ def post_process(iface):
             continue
         value = mi.compute()
         if not value is None:
-            iface.report_file_metric("maintainability_index", value, id)
+            iface.report_metric("maintainability_index", value, scope = mi.scope)
             if value < 20:
-                iface.report_violation("mi_below_20", "MI of " + str(value))
+                iface.report_violation("mi_below_20", "MI of " + str(value),
+                                       scope = mi.scope)
             if value < 65:
-                iface.report_violation("mi_below_65", "MI of " + str(value))
+                iface.report_violation("mi_below_65", "MI of " + str(value),
+                                       scope = mi.scope)

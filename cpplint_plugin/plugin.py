@@ -52,7 +52,7 @@ def file_analysis(iface, scope):
 
 
 def preprocess_file(iface, scope):
-    fpath       = scope.get_path()
+    fpath       = scope.path
     fname       = scope.name
     lf_lines    = []
     crlf_lines  = []
