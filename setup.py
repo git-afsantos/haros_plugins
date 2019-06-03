@@ -7,7 +7,7 @@ def read(fname):
 
 setup(
     name            = "haros_plugins",
-    version         = "1.0.2",
+    version         = "1.0.3",
     author          = "Andre Santos",
     author_email    = "andre.f.santos@inesctec.pt",
     description     = "Plugin repository for HAROS.",
@@ -20,7 +20,7 @@ setup(
     package_data    = {
         "haros_plugin_cccc": ["plugin.yaml"],
         "haros_plugin_ccd": ["plugin.yaml"],
-        "haros_plugin_cppcheck": ["plugin.yaml"],
+        "haros_plugin_cppcheck": ["plugin.yaml", "rules.xml"],
         "haros_plugin_cpplint": ["plugin.yaml"],
         "haros_plugin_lizard": ["plugin.yaml"],
         "haros_plugin_mi_calculator": ["plugin.yaml"],
