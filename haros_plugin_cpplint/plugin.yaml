@@ -19,7 +19,7 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 ---
-name: cpplint_plugin
+name: haros_plugin_cpplint
 version: 0.1
 languages:
     - cpp

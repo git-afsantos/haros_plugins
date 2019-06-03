@@ -1,2 +1,5 @@
 *.pyc
 **/*.pyc
+build/*
+dist/*
+haros_plugins.egg-info/*

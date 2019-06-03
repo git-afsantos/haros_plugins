@@ -1,5 +1,5 @@
 %YAML 1.1
-#Copyright (c) 2016 Andre Santos
+#Copyright (c) 2018 Andre Santos
 #
 #Permission is hereby granted, free of charge, to any person obtaining a copy
 #of this software and associated documentation files (the "Software"), to deal
@@ -19,17 +19,30 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 ---
-name: ccd_plugin
+name: haros_plugin_cccc
 version: 0.1
 languages:
     - cpp
-supported_rules:
-    - halstead_volume_above_8000
-    - halstead_bugs_above_2
+depends:
+    - cccc
+metrics:
+    fan_in:
+        name: Fan-in
+        scope: function
+        description: "The fan-in is the number of other modules which use a given module."
+        minimum: 0
+    fan_out:
+        name: Fan-out
+        scope: function
+        description: "The fan-out is the number of other modules which a given module uses."
+        minimum: 0
+    depth_of_inheritance_tree:
+        name: Depth of Inheritance Tree
+        scope: class
+        description: "Depth of inheritance, also called depth of inheritance tree (DIT), is defined as the maximum length from the node to the root of the tree."
+        minimum: 0
 supported_metrics:
-    - sloc
-    - comments
+    - ploc
+    - cyclomatic_complexity
     - comment_ratio
-    - halstead_bugs
-    - halstead_time
-    - halstead_volume
+    - comments

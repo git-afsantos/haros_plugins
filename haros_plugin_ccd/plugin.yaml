@@ -19,19 +19,17 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 ---
-name: lizard_plugin
+name: haros_plugin_ccd
 version: 0.1
 languages:
     - cpp
-    - java
-    - python
 supported_rules:
-    - max_function_parameters_6
-    - max_cyclomatic_complexity_10
-    - max_cyclomatic_complexity_15
-    - max_function_length_40
-    - max_file_length_400
+    - halstead_volume_above_8000
+    - halstead_bugs_above_2
 supported_metrics:
-    - cyclomatic_complexity
-    - function_parameters
-    - ploc
+    - sloc
+    - comments
+    - comment_ratio
+    - halstead_bugs
+    - halstead_time
+    - halstead_volume

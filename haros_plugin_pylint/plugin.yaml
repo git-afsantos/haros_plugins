@@ -22,7 +22,7 @@
 # This plugin requires pylint
 # > pip install pylint
 ---
-name: pylint_plugin
+name: haros_plugin_pylint
 version: 0.1
 languages:
     - python

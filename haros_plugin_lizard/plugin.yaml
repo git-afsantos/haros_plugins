@@ -19,32 +19,19 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 ---
-name: radon_plugin
+name: haros_plugin_lizard
 version: 0.1
 languages:
+    - cpp
+    - java
     - python
-rules: {}
-metrics: {}
 supported_rules:
-    - max_file_length_400
-    - min_comment_ratio_20
-    - max_comment_ratio_30
-    - max_comment_ratio_40
-    - halstead_volume_above_8000
-    - halstead_bugs_above_2
-    - mi_below_20
-    - mi_below_65
+    - max_function_parameters_6
     - max_cyclomatic_complexity_10
     - max_cyclomatic_complexity_15
+    - max_function_length_40
+    - max_file_length_400
 supported_metrics:
-    - comments
-    - comment_ratio
     - cyclomatic_complexity
-    - halstead_bugs
-    - halstead_time
-    - halstead_volume
-    - lloc
-    - locom
-    - maintainability_index
+    - function_parameters
     - ploc
-    - sloc
