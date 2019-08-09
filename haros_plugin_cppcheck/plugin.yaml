@@ -20,10 +20,17 @@
 #THE SOFTWARE.
 ---
 name: haros_plugin_cppcheck
-version: 0.1
+version: 0.2
 languages:
     - cpp
 rules:
+    cppcheckRule:
+        name:           CppCheck Check
+        scope:          file
+        description:    Error reported by CppCheck.
+        tags:
+            - code-standards
+            - cppcheck
     uninitMemberVar:
         name:           No Uninitialized Member Variables
         scope:          class

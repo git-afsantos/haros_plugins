@@ -62,36 +62,41 @@ RULES = {
 
 
 def package_analysis(iface, scope):
-    FNULL   = open(os.devnull, "w")
-    output  = open(scope.id + ".xml", "w")
+    FNULL = open(os.devnull, "w")
+    output = open(scope.id + ".xml", "w")
     try:
-        subprocess.call(["cppcheck", "--xml-version=2", "--enable=all",
-                            "--rule-file=" + iface.get_file("rules.xml"),
-                            scope.path
-                        ], stdout=FNULL, stderr=output)
+        subprocess.call(
+            ["cppcheck", "--xml-version=2", "--enable=all",
+                "--rule-file=" + iface.get_file("rules.xml"), scope.path],
+            stdout=FNULL, stderr=output)
     finally:
         FNULL.close()
         output.close()
-    files   = file_mapping(scope)
+    files = file_mapping(scope)
     try:
-        xml     = ET.parse(scope.id + ".xml").getroot()
-        errors  = xml.find("errors")
+        xml = ET.parse(scope.id + ".xml").getroot()
+        errors = xml.find("errors")
         for error in errors:
-            handle_report(iface, files, error)
+            handle_report(iface, scope, files, error)
     except ET.ParseError as e:
         pass
 
 
 
-def handle_report(iface, files, error):
+def handle_report(iface, pkg, files, error):
+    scope = pkg
+    line = None
     rule_id = error.get("id")
-    if rule_id in RULES:
-        location = error.find("location")
-        source_file = files.get(location.get("file", default = ""))
-        if source_file:
-            line = int(location.get("line", default = "0"))
-            msg = error.get("verbose", default = error.get("msg"))
-            iface.report_violation(rule_id, msg, scope = source_file, line = line)
+    if rule_id not in RULES:
+        rule_id = "cppcheckRule"
+    msg = error.get("verbose", default=error.get("msg"))
+    location = error.find("location")
+    if location is not None:
+        source_file = files.get(location.get("file", default=""))
+        if source_file is not None:
+            scope = source_file
+            line = int(location.get("line", default="0"))
+    iface.report_violation(rule_id, msg, scope=scope, line=line)
 
 
 def file_mapping(pkg):
