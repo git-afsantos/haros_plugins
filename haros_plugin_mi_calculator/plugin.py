@@ -19,6 +19,7 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
+from __future__ import unicode_literals
 from builtins import str
 from builtins import object
 import math
@@ -116,7 +117,7 @@ def process_file_metric(iface, datum):
         mi.mi = datum.value
 
 def post_process(iface):
-    for id, mi in iface.state.items():
+    for id, mi in list(iface.state.items()):
         if not mi.mi is None:
             continue
         value = mi.compute()

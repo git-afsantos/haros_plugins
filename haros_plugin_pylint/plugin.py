@@ -19,6 +19,7 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
+from __future__ import unicode_literals
 import subprocess
 
 # TODO add a way to suppress certain message types, maybe a config file

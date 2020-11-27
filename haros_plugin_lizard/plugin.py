@@ -21,6 +21,7 @@
 
 # https://github.com/terryyin/lizard
 
+from __future__ import unicode_literals
 from builtins import str
 import lizard
 
