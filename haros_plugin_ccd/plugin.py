@@ -20,6 +20,9 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
+from __future__ import print_function
+
+
 #=============================================================================
 #                         *** CONFIGURATION ***
 #=============================================================================
@@ -28,6 +31,7 @@
 
 # Reserved words and operators for C++
 # Note that pure operators can interleave with reserved words 
+
 RESERVED_WORDS = [
     "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
     "bool", "break", "case", "catch", "char", "char16_t", "char32_t", "class",
@@ -355,9 +359,9 @@ def analyzeComment(comment, regularLines, args):
     hit = totalMaxTresholdHit and totalMinTresholdHit
         
     if (args["verbose"] >= 1 and hit) or (args["verbose"] == 3):
-        print comment
+        print(comment)
         if (args["verbose"] >= 2):
-            print "Analyzed context lines count: %s." % contextLength
+            print("Analyzed context lines count: %s." % contextLength)
             Halstead.printStatistics([
                 codeNoCommentMetrics.getValuesVector(),
                 codeWithCommentMetrics.getValuesVector(),
@@ -370,8 +374,8 @@ def analyzeComment(comment, regularLines, args):
         print ("Lines %s-%s seems to be commented code." 
             %(comment.getFirstLineNumber(), comment.getLastLineNumber()))
     if (args["verbose"] >= 1 and hit) or (args["verbose"] == 3):
-        print ""
-        print "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
+        print("")
+        print("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+")
 
             
 def unzero(v):
