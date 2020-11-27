@@ -21,7 +21,12 @@
 #THE SOFTWARE.
 
 from __future__ import print_function
-
+from __future__ import division
+from builtins import map
+from builtins import zip
+from builtins import str
+from past.utils import old_div
+from builtins import object
 
 #=============================================================================
 #                         *** CONFIGURATION ***
@@ -102,7 +107,7 @@ COMMENTED_CODE_MIN_TRESHOLDS_EXPECTED_PASSES = 9
 import math
 
 
-class Comment:
+class Comment(object):
     def __init__(self):
         self.content = ""
         self.firstLineNumber = -1
@@ -146,7 +151,7 @@ class Comment:
 
             
             
-class Halstead:
+class Halstead(object):
     def __init__(self, source):
         self.operandsCnt = 0
         self.operatorsCnt = 0
@@ -220,9 +225,9 @@ class Halstead:
     
     
     def getDifficulty(self):
-        return (self.getDistinctOperatorsCnt() / 2 * 
+        return (old_div(self.getDistinctOperatorsCnt(), 2 * 
             self.getTotalOparandsCnt() / unzero(
-                self.getDistinctOperandsCnt()))
+                self.getDistinctOperandsCnt())))
     
     
     def getEffort(self):
@@ -244,7 +249,7 @@ class Halstead:
         
 
         
-class CommentFilter:
+class CommentFilter(object):
     def filterComments(self, source):
         """ 
             @input: list of lines of file
@@ -339,12 +344,12 @@ def analyzeComment(comment, regularLines, args):
     codeNoCommentMetrics = Halstead(linesBefore + linesAfter)
     codeWithCommentMetrics =( Halstead(linesBefore + linesAfter + 
         [comment.getContent()]))
-    noCommentPerLineValues = [(1.00 * v) / linesCnt 
+    noCommentPerLineValues = [old_div((1.00 * v), linesCnt) 
         for v in codeNoCommentMetrics.getValuesVector()]       
-    withCommentPerLineValues = [(1.00 * v) / linesCnt 
+    withCommentPerLineValues = [old_div((1.00 * v), linesCnt) 
         for v in codeWithCommentMetrics.getValuesVector()]
 
-    diffValues = [abs(w - n) / unzero(n) * 100 for 
+    diffValues = [old_div(abs(w - n), unzero(n) * 100) for 
         (n, w) in zip(noCommentPerLineValues, withCommentPerLineValues)
     ]
         

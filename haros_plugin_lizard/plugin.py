@@ -21,6 +21,7 @@
 
 # https://github.com/terryyin/lizard
 
+from builtins import str
 import lizard
 
 def file_analysis(iface, scope):

@@ -19,6 +19,8 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
+from builtins import str
+from builtins import object
 import math
 
 MI_PARAMETERS = ("lloc", "sloc", "ploc", "cyclomatic_complexity", "comment_ratio",
@@ -114,7 +116,7 @@ def process_file_metric(iface, datum):
         mi.mi = datum.value
 
 def post_process(iface):
-    for id, mi in iface.state.iteritems():
+    for id, mi in iface.state.items():
         if not mi.mi is None:
             continue
         value = mi.compute()

@@ -23,6 +23,7 @@
 # http://radon.readthedocs.io/en/latest/api.html
 # https://github.com/rubik/radon/tree/master/radon
 
+from builtins import str
 from radon.visitors import ComplexityVisitor
 from radon.metrics import h_visit, mi_compute
 from radon.raw import analyze
