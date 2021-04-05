@@ -59,6 +59,9 @@ if(strcmp(count_tag,"CBO")==0) {
 
 
 def package_analysis(iface, scope):
+    cpp_files = list_files(scope)
+    if not cpp_files:
+        return
     outdir = os.path.join(os.getcwd(), scope.name)
     try:
         os.mkdir(outdir)
@@ -66,7 +69,7 @@ def package_analysis(iface, scope):
         pass # already exists?
     with open(os.devnull, "w") as FNULL:
         subprocess.check_call(["cccc", "--outdir=" + outdir, "--lang=c++"]
-                              + list_files(scope), stdout=FNULL, stderr=FNULL)
+                              + cpp_files, stdout=FNULL, stderr=FNULL)
     with open(os.path.join(outdir, "cccc.xml"), "r") as handle:
         root = ET.parse(handle).getroot()
         summary = root.find("project_summary")
