@@ -392,8 +392,8 @@ def unzero(v):
 
 
 def file_analysis(iface, scope):
-    with open(scope.path, "r") as f:
-        code = f.read().splitlines()
+    with open(scope.path, "rb") as f:
+        code = f.read().decode("utf-8").splitlines()
     com_filter = CommentFilter()
     (regularLines, comments) = com_filter.filterComments(code)
     sloc = scope.lines - com_filter.blankLines
