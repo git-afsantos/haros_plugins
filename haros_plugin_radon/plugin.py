@@ -31,8 +31,8 @@ from radon.raw import analyze
 
 
 def file_analysis(iface, scope):
-    with open(scope.path, "r") as f:
-        code = f.read()
+    with open(scope.path, "rb") as f:
+        code = f.read().decode("utf-8")
     cc = analyse_cc(iface, code)
     lloc, ratio = analyse_raw_metrics(iface, code)
     h = analyse_halstead_metrics(iface, code)
@@ -65,8 +65,8 @@ def analyse_raw_metrics(iface, code):
     iface.report_metric("sloc", metrics.sloc)
     locom = metrics.comments + metrics.multi
     iface.report_metric("comments", locom)
-    ploc = metrics.sloc - locom
-    iface.report_metric("ploc", ploc)
+    # ploc = max(0, metrics.sloc - locom)
+    iface.report_metric("ploc", metrics.sloc)
     if ploc > 400:
         iface.report_violation("max_file_length_400",
                                "File length (PLOC) of " + str(ploc))
