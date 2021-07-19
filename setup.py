@@ -7,9 +7,9 @@ def read(fname):
 
 setup(
     name            = "haros_plugins",
-    version         = "1.1.2",
+    version         = "1.1.3",
     author          = "Andre Santos",
-    author_email    = "andre.f.santos@inesctec.pt",
+    author_email    = "contact.andre.santos@gmail.com",
     description     = "Plugin repository for HAROS.",
     long_description = read("README.md"),
     long_description_content_type="text/markdown",
