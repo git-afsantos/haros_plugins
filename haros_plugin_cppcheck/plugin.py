@@ -68,7 +68,7 @@ def package_analysis(iface, scope):
     output = open(scope.id + ".xml", "w")
     try:
         subprocess.call(
-            ["cppcheck", "--xml-version=2", "--enable=all",
+            ["cppcheck", "--xml-version=2", "--enable=all", "--inconclusive",
                 "--rule-file=" + iface.get_file("rules.xml"), scope.path],
             stdout=FNULL, stderr=output)
     finally:
