@@ -90,7 +90,7 @@ def handle_report(iface, pkg, files, error):
     scope = pkg
     line = None
     rule_id = error.get("id")
-    if rule_id == "missingIncludeSystem":
+    if rule_id.startswith("missingInclude"):
         return # ignored
     if rule_id not in RULES:
         rule_id = "cppcheckRule"
