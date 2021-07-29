@@ -7,7 +7,7 @@ def read(fname):
 
 setup(
     name            = "haros_plugins",
-    version         = "1.1.3",
+    version         = "1.1.4",
     author          = "Andre Santos",
     author_email    = "contact.andre.santos@gmail.com",
     description     = "Plugin repository for HAROS.",

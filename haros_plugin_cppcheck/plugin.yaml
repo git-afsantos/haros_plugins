@@ -20,7 +20,7 @@
 #THE SOFTWARE.
 ---
 name: haros_plugin_cppcheck
-version: 0.2
+version: 0.2.1
 languages:
     - cpp
 rules:
