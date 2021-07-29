@@ -95,6 +95,7 @@ def handle_report(iface, pkg, files, error):
     if rule_id not in RULES:
         rule_id = "cppcheckRule"
     msg = error.get("verbose", default=error.get("msg"))
+    msg = msg.replace(r"\012", "<br>")
     location = error.find("location")
     if location is not None:
         source_file = files.get(location.get("file", default=""))
