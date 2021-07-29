@@ -69,7 +69,8 @@ def package_analysis(iface, scope):
     try:
         subprocess.call(
             ["cppcheck", "--xml-version=2", "--enable=all", "--inconclusive",
-                "--rule-file=" + iface.get_file("rules.xml"), scope.path],
+             "--verbose", "--rule-file=" + iface.get_file("rules.xml"),
+             scope.path],
             stdout=FNULL, stderr=output)
     finally:
         FNULL.close()
@@ -89,6 +90,8 @@ def handle_report(iface, pkg, files, error):
     scope = pkg
     line = None
     rule_id = error.get("id")
+    if rule_id == "missingIncludeSystem":
+        return # ignored
     if rule_id not in RULES:
         rule_id = "cppcheckRule"
     msg = error.get("verbose", default=error.get("msg"))
