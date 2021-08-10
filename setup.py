@@ -9,7 +9,7 @@ setup(
     name            = "haros_plugins",
     version         = "1.1.4",
     author          = "Andre Santos",
-    author_email    = "contact.andre.santos@gmail.com",
+    author_email    = "haros.framework@gmail.com",
     description     = "Plugin repository for HAROS.",
     long_description = read("README.md"),
     long_description_content_type="text/markdown",
