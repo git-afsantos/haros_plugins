@@ -7,7 +7,7 @@ def read(fname):
 
 setup(
     name            = "haros_plugins",
-    version         = "1.1.4",
+    version         = "1.1.5",
     author          = "Andre Santos",
     author_email    = "haros.framework@gmail.com",
     description     = "Plugin repository for HAROS.",
@@ -32,5 +32,5 @@ setup(
         "radon",
         "pylint"
     ],
-    zip_safe        = True
+    zip_safe        = False
 )
